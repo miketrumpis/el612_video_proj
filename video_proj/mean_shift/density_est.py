@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.ndimage as ndimage
-import PIL.Image as PImage
+## from cell_labels import assign_modes_by_density
 
 def image_to_features(image):
     Ny, Nx = image.shape[:-1]
@@ -8,6 +8,56 @@ def image_to_features(image):
     n_color_dim = 1 if len(image.shape) < 3 else 3
     features = np.c_[xx.ravel(), yy.ravel(), image.reshape(Ny*Nx, n_color_dim)]
     return features
+
+def cartesian(arrays, out=None):
+    """
+    Generate a cartesian product of input arrays.
+
+    Parameters
+    ----------
+    arrays : list of array-like
+        1-D arrays to form the cartesian product of.
+    out : ndarray
+        Array to place the cartesian product in.
+
+    Returns
+    -------
+    out : ndarray
+        2-D array of shape (M, len(arrays)) containing cartesian products
+        formed of input arrays.
+
+    Examples
+    --------
+    >>> cartesian(([1, 2, 3], [4, 5], [6, 7]))
+    array([[1, 4, 6],
+           [1, 4, 7],
+           [1, 5, 6],
+           [1, 5, 7],
+           [2, 4, 6],
+           [2, 4, 7],
+           [2, 5, 6],
+           [2, 5, 7],
+           [3, 4, 6],
+           [3, 4, 7],
+           [3, 5, 6],
+           [3, 5, 7]])
+
+    """
+
+    arrays = [np.asarray(x) for x in arrays]
+    dtype = arrays[0].dtype
+
+    n = np.prod([x.size for x in arrays])
+    if out is None:
+        out = np.zeros([n, len(arrays)], dtype=dtype)
+
+    m = n / arrays[0].size
+    out[:,0] = np.repeat(arrays[0], m)
+    if arrays[1:]:
+        cartesian(arrays[1:], out=out[0:m,1:])
+        for j in xrange(1, arrays[0].size):
+            out[j*m:(j+1)*m,1:] = out[0:m,1:]
+    return out
 
 def histogram(img, grid_spacing):
     """
@@ -33,18 +83,26 @@ def histogram(img, grid_spacing):
       or spatio-color space (X,Y,<color dims>)
 
     """
-    Ny, Nx = img.shape[:2]
+    xy_shape = img.shape[:2][::-1]
     n_color_dim = 1 if len(img.shape) < 3 else 3
     im_vec = image_to_features(img)
-    # make the bins accomodate a quick pidgeon-holing later on -- round up
-    ybins, xbins, cbins = map(
-        lambda x: int(np.ceil(float(x)/grid_spacing)),
-        (Ny, Nx, 256)
-        )    
-    p, _ = np.histogramdd(
-        im_vec, bins=(xbins, ybins) + (cbins,)*n_color_dim
+    color_range = tuple(im_vec[:,2:].ptp(axis=0) + 1)
+    # remember im_vec's feature vectors are (x, y, <colors>)
+    bins = map(
+        lambda x: int(np.floor(float(x)/grid_spacing)),
+        xy_shape + color_range
         )
-    return p
+    edges = []
+    for n, d in zip(bins, xy_shape + color_range):
+        r = d - n*grid_spacing
+        edges.append( np.arange(0, (n+1)*grid_spacing, grid_spacing) + r/2. )
+    p, x = np.histogramdd(
+        im_vec, bins=edges
+        )
+    cell_centers = []
+    for edge in x:
+        cell_centers.append( (edge[:-1] + edge[1:])/2 )
+    return p, cell_centers, edges
 
 def smooth_density(p, sigma):
     return ndimage.gaussian_filter(p, sigma, mode='constant')
@@ -102,7 +160,20 @@ def assign_modes_by_density(D, boundary=-1):
         labels[g] = boundary
     return labels.reshape(dims), next_label-1
 
-def segment_image_from_labels(image, labels, grid_size, boundary=-1):
+# should probably Cython this
+def nearest_cell_idx(x, cells):
+    # cells is a d-length list of axis coordinates corresponding
+    # to d-dimensional cell locations
+    nd = len(cells)
+    g_idx = np.empty(x.shape, 'i')
+    for d in xrange(nd):
+        g_axis = cells[d]
+        g_spacing = g_axis[1] - g_axis[0]
+        idx = (x[d]-g_axis[0])/g_spacing
+        g_idx[d] = np.clip(idx.astype('i'), 0, len(g_axis)-2)
+    return g_idx
+
+def segment_image_from_labels(image, labels, cell_locs, boundary=-1):
     # for each pixel in the image, look up the (x,y,r,g,b) feature in
     # the labels function -- this is just a matter of downsampling 
     # (or dividing the indices)
@@ -110,15 +181,15 @@ def segment_image_from_labels(image, labels, grid_size, boundary=-1):
     # features correspond to pixels in row-major order, 
     # so we can just zip the whole
     # course-grid feature indices into a flat list
-    course_features = image_to_features(image)/grid_size
+    features = image_to_features(image)
+    cell_idc = nearest_cell_idx(features.T, cell_locs)
     
     flat_idc = np.lib.index_tricks.ravel_multi_index(
-        course_features.T, labels.shape
+        cell_idc, labels.shape
         )
     seg_img = labels.flat[flat_idc]
     seg_img.shape = image.shape[:2]
     return seg_img
-        
 
 if __name__=='__main__':
     import PIL.Image as PImage
