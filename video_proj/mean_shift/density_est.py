@@ -93,9 +93,10 @@ def histogram(img, grid_spacing):
         xy_shape + color_range
         )
     edges = []
-    for n, d in zip(bins, xy_shape + color_range):
+    minima = (0, 0) + tuple(im_vec[:,2:].min(axis=0))
+    for n, d, mn in zip(bins, xy_shape + color_range, minima):
         r = d - n*grid_spacing
-        edges.append( np.arange(0, (n+1)*grid_spacing, grid_spacing) + r/2. )
+        edges.append( np.arange(mn, (n+1)*grid_spacing, grid_spacing) + r/2. )
     p, x = np.histogramdd(
         im_vec, bins=edges
         )
@@ -134,20 +135,23 @@ def cell_neighbors(c_idx, dims):
         return np.lib.index_tricks.ravel_multi_index(nb_idx, dims)
     return nb_idx
 
-def assign_modes_by_density(D, boundary=-1):
+def assign_modes_by_density(D, boundary=-1, cluster_tol=1e-1):
     dims = D.shape
     D = D.ravel()
     gs = np.argsort(D)[::-1]
     labels = np.zeros(gs.shape, 'i')
     next_label = 1
+    modes = list()
     for g in gs:
         nb_idx = cell_neighbors(g, dims)
         nbs = labels[nb_idx]
         pos_nbs = nbs[nbs>0]
-        # if there are no modes assigned to this group, assign a new one
+        # if there are no modes assigned to this group
         if len(pos_nbs)==0:
+            # assign a new mode
             labels[g] = next_label
             next_label += 1
+            modes.append( (g, D[g]) )
             continue
         # if neighborhood is consistent, then removing the bias will
         # leave nothing behind
@@ -158,12 +162,12 @@ def assign_modes_by_density(D, boundary=-1):
         # if the non-negative neighboring points are mixed modal, then
         # mark down as a boundary        
         labels[g] = boundary
-    return labels.reshape(dims), next_label-1
+    return labels.reshape(dims), next_label-1, np.array(modes)
 
 # should probably Cython this
-def nearest_cell_idx(x, cells):
+def nearest_cell_idx(x, cell_edges):
     # cells is a d-length list of axis coordinates corresponding
-    # to d-dimensional cell locations
+    # to d-dimensional cell edges
     nd = len(cells)
     g_idx = np.empty(x.shape, 'i')
     for d in xrange(nd):

@@ -1,4 +1,3 @@
-# cython: profile=True
 """ -*- python -*- file
 """
 import numpy as np
