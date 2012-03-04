@@ -56,7 +56,7 @@ def mean_shift_update2(y, xgrid, density):
     
     
     
-def walk_uphill(labels, cell_edges, features, sigma, boundary=-1):
+def walk_uphill(labels, p, cell_edges, features, sigma, boundary=-1):
     """
     For each boundary point in labels, perform a gradient ascent using
     the mean shift sequence. Terminate the walk once the sequence enters
@@ -67,6 +67,8 @@ def walk_uphill(labels, cell_edges, features, sigma, boundary=-1):
 
     labels: ndarray
       label map of the histogram grid points
+    p: ndarray
+      density over grid
     cell_edges: sequence
       bin edges of the histogram (needed for grid index conversion)
     features: ndarray
@@ -75,22 +77,24 @@ def walk_uphill(labels, cell_edges, features, sigma, boundary=-1):
       kernel bandwidth
 
     """
-    
-    boundary_pts = np.where(labels==boundary)
+    # the boundary points should be ordered by decreasing density
+    boundary_pts = np.where(labels.ravel()==boundary)[0]
+    order = np.argsort(p.flat[boundary_pts])[::-1]
+    boundary_pts = np.unravel_index(boundary_pts[order], labels.shape)
     max_iter = 20
     for x in itertools.izip(*boundary_pts):
         walking = True
         f_idx = np.lib.index_tricks.ravel_multi_index(x, labels.shape)
         # what is the correspondence between (i,j,k) in labels index
         # and the approximate feature vector? guess we need lookup
-        y = np.array([ (d[k], d[k+1])/2.0 for d,k in zip(cell_edges, x) ])
+        y = np.array([ (d[k] + d[k+1])/2.0 for d,k in zip(cell_edges, x) ])
         n = 0
         while walking:
             # can this be scaled to unit variance per grid length?
             # yes, but it would not correspond to a valid grid index
             # unless the cell edges begin at zero
-            y = mean_shift_update(y, features, sigma) 
-            cx = d_est.nearest_cell_idx(y, cell_edges)
+            y = mean_shift_update(y, features, 2*sigma)
+            cx = density_est.nearest_cell_idx(y, cell_edges)
             cx_label = labels[tuple(cx)]
             if cx_label != boundary:
                 labels[x] = cx_label
@@ -98,7 +102,7 @@ def walk_uphill(labels, cell_edges, features, sigma, boundary=-1):
             n += 1
             if n >= max_iter:
                 walking = False
-        print 'label', cx_label, 'after', n, 'iters'
+        ## print 'label', cx_label, 'after', n, 'iters'
 
 ## def walk_uphill2(labels, density, bin_count, boundary=-1):
 ##     """

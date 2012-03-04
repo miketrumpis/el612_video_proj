@@ -59,7 +59,7 @@ def cartesian(arrays, out=None):
             out[j*m:(j+1)*m,1:] = out[0:m,1:]
     return out
 
-def histogram(img, grid_spacing):
+def histogram(img, grid_spacing, spatial_coords=True):
     """
     Estimate the ND probability density of an image by histogram over an
     regularly spaced grid.
@@ -83,7 +83,7 @@ def histogram(img, grid_spacing):
       or spatio-color space (X,Y,<color dims>)
 
     """
-    xy_shape = img.shape[:2][::-1]
+    xy_shape = img.shape[:2][::-1] if spatial_coords else ()
     n_color_dim = 1 if len(img.shape) < 3 else 3
     im_vec = image_to_features(img)
     color_range = tuple(im_vec[:,2:].ptp(axis=0) + 1)
@@ -93,12 +93,14 @@ def histogram(img, grid_spacing):
         xy_shape + color_range
         )
     edges = []
-    minima = (0, 0) + tuple(im_vec[:,2:].min(axis=0))
+    color_minima = tuple(im_vec[:,2:].min(axis=0))
+    minima = (0, 0) + color_minima if spatial_coords else color_minima
     for n, d, mn in zip(bins, xy_shape + color_range, minima):
         r = d - n*grid_spacing
         edges.append( np.arange(mn, (n+1)*grid_spacing, grid_spacing) + r/2. )
+    features = im_vec if spatial_coords else im_vec[:,2:]
     p, x = np.histogramdd(
-        im_vec, bins=edges
+        features, bins=edges
         )
     cell_centers = []
     for edge in x:
@@ -141,7 +143,8 @@ def assign_modes_by_density(D, boundary=-1, cluster_tol=1e-1):
     gs = np.argsort(D)[::-1]
     labels = np.zeros(gs.shape, 'i')
     next_label = 1
-    modes = list()
+    idc_by_mode = dict()
+    peak_by_mode = dict()
     for g in gs:
         nb_idx = cell_neighbors(g, dims)
         nbs = labels[nb_idx]
@@ -150,34 +153,76 @@ def assign_modes_by_density(D, boundary=-1, cluster_tol=1e-1):
         if len(pos_nbs)==0:
             # assign a new mode
             labels[g] = next_label
+            idc_by_mode[next_label] = [g]
+            peak_by_mode[next_label] = D[g]
             next_label += 1
-            modes.append( (g, D[g]) )
             continue
         # if neighborhood is consistent, then removing the bias will
         # leave nothing behind
         test = pos_nbs[0]
         if np.sum(pos_nbs - test) == 0:
             labels[g] = test
+            idc_by_mode[test].append(g)
             continue
         # if the non-negative neighboring points are mixed modal, then
-        # mark down as a boundary        
-        labels[g] = boundary
-    return labels.reshape(dims), next_label-1, np.array(modes)
+        # check for persistence between modes
+        modes = np.unique(pos_nbs)
+        sub_modes = sorted(modes, key=peak_by_mode.get, reverse=True)
+        survivors = list()
+        while sub_modes:
+            dom = sub_modes[0]
+            survivors.append(dom)
+            sub_modes = sub_modes[1:]
+            pa = peak_by_mode[dom]
+            s_idx = 0
+            while s_idx < len(sub_modes):
+                sub = sub_modes[s_idx]
+                pb = peak_by_mode[sub]
+                if (pa - pb) < cluster_tol:
+                    # consume this mode
+                    sub_idc = idc_by_mode[sub]
+                    np.put(labels, sub_idc, dom)
+                    idc_by_mode[dom].extend(sub_idc)
+                    idc_by_mode.pop(sub)
+                    peak_by_mode.pop(sub)
+                    print 'merged label', sub, 'into', dom
+                    sub_modes.remove(sub)
+                else:
+                    # do not consume, and advance counter
+                    s_idx += 1
+        # if there was one dominant mode, then mark g as that mode,
+        # otherwise mark it as a boundary
+        if len(survivors)==1:
+            dom = survivors[0]
+            labels[g] = dom
+            idc_by_mode[dom].append(g)
+        else:
+            labels[g] = boundary
+    # clean up gaps in labels
+    mode_labels = sorted(idc_by_mode.keys())
+    mx_label = len(mode_labels)
+    # new_correspondence
+    for k, m in zip(xrange(1,mx_label+1), mode_labels):
+        mode_idc = idc_by_mode[m]
+        np.put(labels, mode_idc, k)
+    return labels.reshape(dims), mx_label
 
 # should probably Cython this
 def nearest_cell_idx(x, cell_edges):
-    # cells is a d-length list of axis coordinates corresponding
+    # cell_edges is a d-length list of axis coordinates corresponding
     # to d-dimensional cell edges
-    nd = len(cells)
+    nd = len(cell_edges)
     g_idx = np.empty(x.shape, 'i')
     for d in xrange(nd):
-        g_axis = cells[d]
+        g_axis = cell_edges[d]
         g_spacing = g_axis[1] - g_axis[0]
         idx = (x[d]-g_axis[0])/g_spacing
         g_idx[d] = np.clip(idx.astype('i'), 0, len(g_axis)-2)
     return g_idx
 
-def segment_image_from_labels(image, labels, cell_locs, boundary=-1):
+def segment_image_from_labels(
+        image, labels, cell_locs, boundary=-1, spatial_features=True
+        ):
     # for each pixel in the image, look up the (x,y,r,g,b) feature in
     # the labels function -- this is just a matter of downsampling 
     # (or dividing the indices)
@@ -186,6 +231,8 @@ def segment_image_from_labels(image, labels, cell_locs, boundary=-1):
     # so we can just zip the whole
     # course-grid feature indices into a flat list
     features = image_to_features(image)
+    if not spatial_features:
+        features = features[:,2:]
     cell_idc = nearest_cell_idx(features.T, cell_locs)
     
     flat_idc = np.lib.index_tricks.ravel_multi_index(
