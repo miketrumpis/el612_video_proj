@@ -1,3 +1,4 @@
+# cython: profile=True
 """ -*- python -*- file
 """
 import numpy as np
@@ -9,28 +10,30 @@ cimport cython
 def assign_modes_by_density(
         D, np.int32_t boundary=-1
         ):
-    dims = D.shape
+    cdef tuple dims = D.shape
+    cdef int nd = len(dims)
     cdef np.ndarray[np.float64_t, ndim=1] Df = D.ravel()
     cdef np.ndarray[np.int64_t, ndim=1] gs = np.argsort(Df)
     cdef np.ndarray[np.int32_t, ndim=1] labels = np.zeros((len(gs),), 'i')
     cdef np.ndarray[np.int32_t, ndim=1] nbs, pos_nbs
     cdef np.ndarray[np.int64_t, ndim=1] nb_idx
-    cdef int x, g
+    cdef np.ndarray[np.int64_t, ndim=2] nb_idx_arr = np.empty((nd, 3**nd), 'l')
+    cdef np.ndarray[np.int64_t, ndim=1] g_nd_arr = np.empty((nd,), 'l')
+    cdef int x, i, g
+    cdef list g_nd = [0]*nd
     cdef np.int32_t test, next_label = 1
     for x in xrange(len(gs)-1, -1, -1):
         if x%1000 == 0:
             print x, ' '
         g = gs[x]
-        ## nb_idx = cell_neighbors(g, dims)
-        nb_idx = np.ravel_multi_index(
-            cell_neighbors_brute(
-                np.array(np.unravel_index(g, dims)), dims
-                ),
-                dims
-            )
-                
-        nbs = labels[nb_idx]
-        pos_nbs = nbs[nbs>0]
+        multi_idx(g, dims, g_nd)
+        for i in range(nd):
+            g_nd_arr[i] = g_nd[i]
+        num_nb = cell_neighbors_brute(g_nd_arr, dims, nb_idx_arr)
+        nb_idx = flatten_idx(nb_idx_arr[:,:num_nb], dims)
+        nbs = np.take(labels, nb_idx)
+        pos_idx = np.where(nbs>0)[0]
+        pos_nbs = np.take(nbs, pos_idx)
         # if there are no modes assigned to this group, assign a new one
         if len(pos_nbs)==0:
             labels[g] = next_label
@@ -49,53 +52,48 @@ def assign_modes_by_density(
     labels_nd = np.reshape(labels, dims)
     return labels_nd, next_label-1
 
-nb_1x1_offsets_6D = \
-  np.mgrid[ (slice(-1,2),) * 6 ].reshape(6, -1)
-nb_1x1_offsets_5D = \
-  np.mgrid[ (slice(-1,2),) * 5 ].reshape(5, -1)
-nb_1x1_offsets_3D = \
-  np.mgrid[ (slice(-1,2),) * 3 ].reshape(3, -1)
+def flatten_idx_passthru(np.ndarray[np.int64_t, ndim=2] idx, tuple dims):
+    return flatten_idx(idx, dims)
 
-cdef np.ndarray cell_neighbors(c_idx, dims):
-    # if c_idx is a flattened coordinate (eg, z*Nx*Ny + y*Nx + x),
-    # then unravel it and proceed
-    if np.isscalar(c_idx):
-        scl_idx = True
-        c_idx = np.lib.index_tricks.unravel_index(c_idx, dims)
-    else:
-        scl_idx = False
+def multi_idx_passthru(int flat_idx, tuple dims):
+    idx = [0]*len(dims)
+    multi_idx(flat_idx, dims, idx)
+    return idx
 
-    nd = len(dims)
-    # pad blank dimensions into c_idx
-    c_idx = np.array(c_idx)
-    c_idx.shape = (nd,) + (1,)*nd
-    if nd==3:
-        nb_offsets = nb_1x1_offsets_3D
-    elif nd==5:
-        nb_offsets = nb_1x1_offsets_5D
-    else:
-        nb_offsets = nb_1x1_offsets_6D
-    nb_idx = (nb_offsets + c_idx).reshape( nd, -1 )
-    # reject coordinates outside frame
-    keep_cols = (nb_idx >=0 ).all(axis=0)
-    nb_idx = nb_idx[:, keep_cols]
-    keep_cols = np.ones( (nb_idx.shape[1],), np.bool )
-    for k in xrange(nd):
-        keep_cols &= nb_idx[k] < dims[k]
-    nb_idx = nb_idx[:,keep_cols]
-    if scl_idx:
-        # finally, transform back to 1D indices
-        return np.lib.index_tricks.ravel_multi_index(nb_idx, dims)
-    return nb_idx
+@cython.boundscheck(False)
+cdef np.ndarray[np.int64_t, ndim=1] flatten_idx(
+    np.ndarray[np.int64_t, ndim=2] idx,
+    tuple dims
+    ):
+    cdef int nd = len(dims)
+    cdef int n_idx = idx.shape[1]
+    cdef int j, k, stride=1
+    cdef np.ndarray[np.int64_t, ndim=1] f_idx = np.zeros((n_idx,), 'l')
+    for k in range(nd-1, -1, -1):
+        for j in range(n_idx):
+            f_idx[j] += idx[k,j] * stride
+        stride *= dims[k]
+    return f_idx
+
+cdef inline void multi_idx(int flat_idx, tuple dims, list idx):
+    cdef int k, nd = len(dims)
+    for k in range(nd-1, -1, -1):
+        idx[k] = flat_idx % dims[k]
+        flat_idx -= idx[k]
+        flat_idx = <int> (flat_idx / dims[k])
+    return
 
 cdef inline int oob(np.int64_t i, int N):
     if (i < 0) or (i >= N):
         return 1
     return 0
 
-def cell_neighbors_brute(np.ndarray[np.int64_t, ndim=1] idx, dims):
+@cython.boundscheck(False)
+cdef int cell_neighbors_brute(
+    np.ndarray[np.int64_t, ndim=1] idx, tuple dims,
+    np.ndarray[np.int64_t, ndim=2] nb_idx
+    ):
     cdef int k = 0        
-    cdef np.ndarray[np.int64_t, ndim=2] nb_idx = np.empty( (5, 3**5), 'l' )
     cdef np.int64_t a0, a1, a2, a3, a4
     for a0 in range(-1,2):
         if oob(idx[0]+a0, dims[0]):
@@ -118,5 +116,5 @@ def cell_neighbors_brute(np.ndarray[np.int64_t, ndim=1] idx, dims):
                         nb_idx[3,k] = idx[3]+a3
                         nb_idx[4,k] = idx[4]+a4
                         k += 1
-    return nb_idx[:,:k]
+    return k
 

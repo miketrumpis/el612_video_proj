@@ -1,3 +1,4 @@
+from __future__ import division
 import numpy as np
 import matplotlib.pyplot as pp
 import video_proj.mean_shift.density_est as d_est
@@ -20,16 +21,16 @@ img = np.array(img)
 pp.figure()
 pp.imshow(img)
 img = colors.rgb2lab(img)
-sigma = 10.0
+sigma = 20.0
 spatial = True
 
-## b, cell_locs, edges = d_est.histogram(img, sigma, spatial_coords=spatial)
-## p = d_est.smooth_density(b, 1)
+b, cell_locs, edges = d_est.histogram(img, sigma, spatial_coords=spatial)
+p = d_est.smooth_density(b, 1)
 ## p = b
 ## p /= b.sum()
-## zmask = (p==0)
-## min_p = p[~zmask].min()
-## p[zmask] = 0.9*min_p
+zmask = (p==0)
+min_p = p[~zmask].min()
+p[zmask] = 0.9*min_p
 ## ## persistence_factor = p.ptp() * .05
 ## labels, mx_label = d_est.assign_modes_by_density(
 ##     np.log(p), cluster_tol=2
@@ -59,3 +60,4 @@ spatial = True
 ## pp.imshow(np.ma.masked_where(s_img2<0, s_img2), cmap=cm)
 ## pp.colorbar()
 ## pp.show()
+

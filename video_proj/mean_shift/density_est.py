@@ -108,7 +108,8 @@ def histogram(img, grid_spacing, spatial_coords=True):
     return p, cell_centers, edges
 
 def smooth_density(p, sigma):
-    return ndimage.gaussian_filter(p, sigma, mode='constant')
+    ## return ndimage.gaussian_filter(p, sigma, mode='constant')
+    return ndimage.gaussian_filter(p, sigma)
 
 def cell_neighbors(c_idx, dims):
     # if c_idx is a flattened coordinate (eg, z*Nz*Ny + y*Ny + x),
