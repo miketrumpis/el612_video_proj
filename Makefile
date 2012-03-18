@@ -7,17 +7,11 @@
 
 PKGDIR=video_proj
 
-help:
-	@echo "Numpy/Cython tasks.  Available tasks:"
-	@echo "ext  -> build the Cython extension module."
-	@echo "html -> create annotated HTML from the .pyx sources"
-	@echo "all  -> builds ext"
-
 all: ext
 
-ext: cell_labels.so
+ext: cell_labels.so histogram.so
 
-html:  ${PKGDIR}/mean_shift/cell_labels.html
+html:  ${PKGDIR}/mean_shift/cell_labels.html ${PKGDIR}/mean_shift/histogram.html
 
 cell_labels.so: ${PKGDIR}/mean_shift/cell_labels.c
 

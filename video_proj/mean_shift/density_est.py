@@ -167,39 +167,38 @@ def assign_modes_by_density(D, boundary=-1, cluster_tol=1e-1):
         # if the non-negative neighboring points are mixed modal, then
         # check for persistence between modes
         modes = np.unique(pos_nbs)
-        sub_modes = sorted(modes, key=peak_by_mode.get, reverse=True)
-        survivors = list()
-        while sub_modes:
-            dom = sub_modes[0]
-            survivors.append(dom)
-            sub_modes = sub_modes[1:]
-            pa = peak_by_mode[dom]
-            s_idx = 0
-            while s_idx < len(sub_modes):
-                sub = sub_modes[s_idx]
-                pb = peak_by_mode[sub]
-                if (pa - pb) < cluster_tol:
-                    # consume this mode
-                    sub_idc = idc_by_mode[sub]
-                    np.put(labels, sub_idc, dom)
-                    idc_by_mode[dom].extend(sub_idc)
-                    idc_by_mode.pop(sub)
-                    peak_by_mode.pop(sub)
-                    print 'merged label', sub, 'into', dom
-                    sub_modes.remove(sub)
-                else:
-                    # do not consume, and advance counter
-                    s_idx += 1
+        saddle_val = D[g]
+        # sort modes by increasing height
+        modes = np.array(sorted(modes, key=peak_by_mode.get))
+        mode_pks = np.array([peak_by_mode[m] for m in modes])
+        # mark down all modes within tolerance of the saddle point,
+        # followed by the next highest mode (or the last highest
+        # of the former group, if that group includes all neighbors)
+        sub_modes = modes[ (mode_pks[:-1] - saddle_val) < cluster_tol ]
+        final_mode = modes[ len(sub_modes) ]
+        sub_modes = np.r_[sub_modes, final_mode]
+        # merge each mode into the subsequent mode
+        for n, sub in enumerate(sub_modes[:-1]):
+            dom = sub_modes[n+1]
+            # consume mode into next
+            sub_idc = idc_by_mode[sub]
+            np.put(labels, sub_idc, dom)
+            idc_by_mode[dom].extend(sub_idc)
+            idc_by_mode.pop(sub)
+            peak_by_mode.pop(sub)
+            print 'merged label', sub, 'into', dom
+        
         # if there was one dominant mode, then mark g as that mode,
         # otherwise mark it as a boundary
-        if len(survivors)==1:
-            dom = survivors[0]
-            labels[g] = dom
-            idc_by_mode[dom].append(g)
+        if final_mode == modes[-1]:
+            labels[g] = final_mode
+            idc_by_mode[final_mode].append(g)
         else:
             labels[g] = boundary
     # clean up gaps in labels
-    mode_labels = sorted(idc_by_mode.keys())
+    mode_labels = sorted(
+        peak_by_mode.keys(), key=peak_by_mode.get, reverse=True
+        )
     mx_label = len(mode_labels)
     # new_correspondence
     for k, m in zip(xrange(1,mx_label+1), mode_labels):

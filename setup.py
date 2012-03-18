@@ -25,12 +25,18 @@ cell_label = Extension(
     include_dirs = dirs, 
     extra_compile_args=['-O3']
     )
+histogram = Extension(
+    'video_proj.mean_shift.histogram',
+    ['video_proj/mean_shift/histogram.pyx'], 
+    include_dirs = dirs, 
+    extra_compile_args=['-O3']
+    )
 
 if __name__=='__main__':
     setup(
         name = 'video_proj',
         version = '1.0',
         packages = ['video_proj', 'video_proj.mean_shift'],
-        ext_modules = [ cell_label ],
+        ext_modules = [ cell_label, histogram ],
         cmdclass = {'build_ext': build_ext}
     )
