@@ -5,11 +5,25 @@ import numpy as np
 cimport numpy as np
 cimport cython
 
-# D is double float -- just make an array of signed ints
+# a simple container
+class Saddle(object):
+    def __init__(self, idx, elevation, neighbors):
+        self.idx = idx
+        self.elevation = elevation
+        self.neighbors = neighbors
+
+    def __repr__(self):
+        return 'index: %d, elevation: %1.2f, neighbors: %s'%(
+            self.idx, self.elevation, self.neighbors
+            )
+
 @cython.boundscheck(False)
 def assign_modes_by_density(
         D, np.int32_t boundary=-1
         ):
+    clusters = dict()
+    peak_by_mode = dict()
+    saddles = list()
     cdef tuple dims = D.shape
     cdef int nd = len(dims)
     cdef np.ndarray[np.float64_t, ndim=1] Df = D.ravel()
@@ -37,6 +51,9 @@ def assign_modes_by_density(
         # if there are no modes assigned to this group, assign a new one
         if len(pos_nbs)==0:
             labels[g] = next_label
+            # start new cluster and note the peak
+            clusters[<int>next_label] = [g]
+            peak_by_mode[<int>next_label] = Df[g]
             next_label += 1
             continue
         # if neighborhood is consistent, then removing the bias will
@@ -44,13 +61,16 @@ def assign_modes_by_density(
         test = pos_nbs[0]
         if np.sum(pos_nbs - test) == 0:
             labels[g] = test
+            clusters[<int>test].append(g)
             continue
         # if the non-negative neighboring points are mixed modal, then
         # mark down as a boundary        
         labels[g] = boundary
+        saddles.append( Saddle(g, Df[g], np.unique(pos_nbs)) )
 
+    saddles = sorted(saddles, key=lambda x: x.elevation, reverse=True)
     labels_nd = np.reshape(labels, dims)
-    return labels_nd, next_label-1
+    return labels_nd, clusters, peak_by_mode, saddles
 
 def flatten_idx_passthru(np.ndarray[np.int64_t, ndim=2] idx, tuple dims):
     return flatten_idx(idx, dims)
@@ -90,11 +110,13 @@ cdef inline int oob(np.int64_t i, int N):
 
 @cython.boundscheck(False)
 cdef int cell_neighbors_brute(
-    np.ndarray[np.int64_t, ndim=1] idx, tuple dims,
+    np.ndarray[np.int64_t, ndim=1] idx,
+    tuple dims,
     np.ndarray[np.int64_t, ndim=2] nb_idx
     ):
     cdef int k = 0        
     cdef np.int64_t a0, a1, a2, a3, a4
+    cdef int nd = len(dims)
     for a0 in range(-1,2):
         if oob(idx[0]+a0, dims[0]):
             continue
@@ -104,17 +126,23 @@ cdef int cell_neighbors_brute(
             for a2 in range(-1,2):
                 if oob(idx[2]+a2, dims[2]):
                     continue
-                for a3 in range(-1,2):
-                    if oob(idx[3]+a3, dims[3]):
-                        continue
-                    for a4 in range(-1,2):
-                        if oob(idx[4]+a4, dims[4]):
+                if nd == 3:
+                    nb_idx[0,k] = idx[0]+a0
+                    nb_idx[1,k] = idx[1]+a1
+                    nb_idx[2,k] = idx[2]+a2
+                    k += 1
+                else:
+                    for a3 in range(-1,2):
+                        if oob(idx[3]+a3, dims[3]):
                             continue
-                        nb_idx[0,k] = idx[0]+a0
-                        nb_idx[1,k] = idx[1]+a1
-                        nb_idx[2,k] = idx[2]+a2
-                        nb_idx[3,k] = idx[3]+a3
-                        nb_idx[4,k] = idx[4]+a4
-                        k += 1
+                        for a4 in range(-1,2):
+                            if oob(idx[4]+a4, dims[4]):
+                                continue
+                            nb_idx[0,k] = idx[0]+a0
+                            nb_idx[1,k] = idx[1]+a1
+                            nb_idx[2,k] = idx[2]+a2
+                            nb_idx[3,k] = idx[3]+a3
+                            nb_idx[4,k] = idx[4]+a4
+                            k += 1
     return k
 

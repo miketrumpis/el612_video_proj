@@ -1,4 +1,3 @@
-# cython: profile=True
 """ -*- python -*- file
 """
 import numpy as np
@@ -12,6 +11,25 @@ def nearest_cell_idx(
         np.ndarray[np.float64_t, ndim=2] x,
         cell_edges
         ):
+    """
+    Find the nearest neighbor index according to the cell edges,
+    for each vectors in x
+
+    Parameters
+    ----------
+
+    x: ndarray (nvec, ndim)
+      Matrix of nvec vectors, each of ndim dimensions
+
+    cell_edges: list
+      ndim-length list of cell edges for some grid space
+
+    Returns
+    -------
+
+    g_idx: ndarray (nvec, ndim)
+      Nearest-neighbor grid indices
+    """
     # cell_edges is a d-length list of axis coordinates corresponding
     # to d-dimensional cell edges
     cdef int d, r, idx, g_max
@@ -111,4 +129,3 @@ def histogram(
         b[bin] += 1
     
     return b.reshape(tuple(bins)), cell_centers, edges
-    ## return None, cell_centers, edges
