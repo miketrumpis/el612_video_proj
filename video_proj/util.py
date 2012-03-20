@@ -1,15 +1,72 @@
 import numpy as np
+import matplotlib.pyplot as pp
+import matplotlib.animation as animation
+
+import colors
+from glob import glob
 
 def image_to_features(image):
     """
     Convert image array into matrix of feature vectors, where each row
     contains a vector (x, y, c1, [c2, c3]), where ck are color values.
     """
-    Ny, Nx = image.shape[:-1]
+    Ny, Nx = image.shape[:2]
     yy, xx = np.mgrid[0:Ny, 0:Nx]
     n_color_dim = 1 if len(image.shape) < 3 else 3
     features = np.c_[xx.ravel(), yy.ravel(), image.reshape(Ny*Nx, n_color_dim)]
     return features
+
+def yuv_image(b_arr, Nx, Ny, yuv_mode='420'):
+    """
+    Convert an array of bytes containing YUV information into an
+    RGB frame with dimensions in shape.
+    """
+    if isinstance(b_arr, str):
+        b_arr = open(b_arr, 'rb')
+    if isinstance(b_arr, file):
+        b_arr = np.fromfile(b_arr, dtype=np.uint8)
+    if yuv_mode == '444':
+        c_sub = 1
+        raise NotImplementedError
+    if yuv_mode in ('420', '422'):
+        c_sub = 2
+    else:
+        raise NotImplementedError
+    cbytes = Nx*Ny/c_sub**2
+    y = b_arr[:Nx*Ny]
+    u = b_arr[Nx*Ny:Nx*Ny+cbytes]
+    v = b_arr[Nx*Ny+cbytes:]
+    y.shape = (Ny, Nx); u.shape = (Ny/2, Nx/2); v.shape = (Ny/2, Nx/2)
+    if c_sub > 1:
+        u = np.repeat(u, c_sub, axis=0); u = np.repeat(u, c_sub, axis=1)
+        v = np.repeat(v, c_sub, axis=0); v = np.repeat(v, c_sub, axis=1)
+    image = np.c_[y.ravel(), u.ravel(), v.ravel()]
+    rgb_image = colors.yuv2rgb(image).reshape(Ny,Nx,3)
+    return rgb_image
+    
+def yuv_sequence(b_root, Nx, Ny, yuv_mode='420', t_range=()):
+    b_files = glob(b_root)
+    if t_range:
+        b_files = b_files[t_range[0]:t_range[1]]
+    vid = np.empty((len(b_files), Ny, Nx, 3), np.uint8)
+    for t,f in enumerate(b_files):
+        vid[t] = yuv_image(f, Nx, Ny)
+    return vid
+
+def animate_frames(frames, movie_name='', image_fov=None, fps=5):
+    fig = pp.figure()
+    ims = []
+    for n, f in enumerate(frames):
+        i = pp.imshow(f, extent=image_fov)
+        x,_ = i.axes.get_xlim()
+        y,_ = i.axes.get_ylim()
+##         i.axes.text(x+1,y+1,'Frame %d'%(n+1,))
+##         i.axes.set_title('Frame %d'%(n+1,))
+        ims.append([i])
+    ani = animation.ArtistAnimation(fig, ims)
+    if movie_name:
+        ani.save(movie_name+'.mp4', fps=fps)
+    return ani
 
 def cartesian(arrays, out=None):
     """

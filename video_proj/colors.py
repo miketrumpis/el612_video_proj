@@ -37,5 +37,18 @@ def rgb2lab(image):
     lab_image.shape = ishape
     return lab_image
 
-        
+yuv_offset = np.array([16, 128, 128], 'B')
+yuv_rgb_xform = np.array([ [1.164,  0.000,  1.596],
+                           [1.164, -0.392, -0.813],
+                           [1.164,  2.017,  0.000] ])
+def yuv2rgb(image):
+    shape = image.shape
+    image.shape = (-1, 3)
+    rgb_image = image.astype('h') - yuv_offset
+    ## rgb_image = np.round(np.dot(yuv_rgb_xform, rgb_image))
+    rgb_image = np.round(np.dot(rgb_image, yuv_rgb_xform.T))
+    rgb_image_bytes = np.empty(image.shape, 'B')
+    np.clip(rgb_image, 0, 255, out=rgb_image_bytes)
+    return rgb_image_bytes
+    
     

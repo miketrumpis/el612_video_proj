@@ -1,6 +1,6 @@
-# cython: profile=True
 """ -*- python -*- file
 """
+# cython: profile=True
 import numpy as np
 cimport numpy as np
 cimport cython
@@ -30,6 +30,7 @@ def assign_modes_by_density(
     cdef np.ndarray[np.int64_t, ndim=1] gs = np.argsort(Df)
     cdef np.ndarray[np.int32_t, ndim=1] labels = np.zeros((len(gs),), 'i')
     cdef np.ndarray[np.int32_t, ndim=1] nbs, pos_nbs
+    cdef np.ndarray[np.int64_t, ndim=1] pm = np.array([-1, 1], 'l')
     cdef np.ndarray[np.int64_t, ndim=1] nb_idx
     cdef np.ndarray[np.int64_t, ndim=2] nb_idx_arr = np.empty((nd, 3**nd), 'l')
     cdef np.ndarray[np.int64_t, ndim=1] g_nd_arr = np.empty((nd,), 'l')
@@ -40,12 +41,17 @@ def assign_modes_by_density(
         if x%1000 == 0:
             print x, ' '
         g = gs[x]
-        multi_idx(g, dims, g_nd)
-        for i in range(nd):
-            g_nd_arr[i] = g_nd[i]
-        num_nb = cell_neighbors_brute(g_nd_arr, dims, nb_idx_arr)
-        nb_idx = flatten_idx(nb_idx_arr[:,:num_nb], dims)
-        nbs = np.take(labels, nb_idx)
+        # if miraculously this is a one dimensional density, then
+        # the cell neighbors are [g-1, g+1]
+        if nd == 1:
+            nbs = np.take(labels, pm+g, mode='clip')
+        else:
+            multi_idx(g, dims, g_nd)
+            for i in range(nd):
+                g_nd_arr[i] = g_nd[i]
+            num_nb = cell_neighbors_brute(g_nd_arr, dims, nb_idx_arr)
+            nb_idx = flatten_idx(nb_idx_arr[:,:num_nb], dims)
+            nbs = np.take(labels, nb_idx)
         pos_idx = np.where(nbs>0)[0]
         pos_nbs = np.take(nbs, pos_idx)
         # if there are no modes assigned to this group, assign a new one

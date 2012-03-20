@@ -1,7 +1,10 @@
+# NOTE! Need to make sigma arguments work for mixed spatial/color bandwidths
+
+from __future__ import division
 import numpy as np
 import itertools
 import scipy.ndimage as ndimage
-from sklearn.ball_tree import BallTree
+from sklearn.neighbors import BallTree
 
 from histogram import nearest_cell_idx
 
@@ -32,7 +35,15 @@ def resolve_segmentation_boundaries(
     bpts = np.where(seg_image==boundary)
     ishape = seg_image.shape
     btree = BallTree(features, p=2)
+    k = 1
+    n_pt = len(bpts[0])
+    next_pct = 10
     for y, x in zip(*bpts):
+        pct = int(100*(k/float(n_pt)))
+        k += 1
+        if pct==next_pct:
+            next_pct += 10
+            print pct, '%'
         fvec = features[y*ishape[1] + x]
         assigned = False
         n_iter = 0

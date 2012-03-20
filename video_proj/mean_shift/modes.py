@@ -3,11 +3,10 @@ import scipy.ndimage as ndimage
 
 from cell_labels import Saddle
 from histogram import nearest_cell_idx
-import ..util as ut
+from ..util import image_to_features
 
-def smooth_density(p, sigma):
-    ## return ndimage.gaussian_filter(p, sigma, mode='constant')
-    return ndimage.gaussian_filter(p, sigma)
+def smooth_density(p, sigma, **gaussian_kws):
+    return ndimage.gaussian_filter(p, sigma, **gaussian_kws)
 
 def cell_neighbors(c_idx, dims):
     """
@@ -51,7 +50,7 @@ def segment_image_from_labeled_modes(
     # features correspond to pixels in row-major order, 
     # so we can just zip the whole
     # course-grid feature indices into a flat list
-    features = ut.image_to_features(image)
+    features = image_to_features(image)
     if not spatial_features:
         features = features[:,2:]
     cell_idc = nearest_cell_idx(features, cell_locs)
@@ -64,11 +63,16 @@ def segment_image_from_labeled_modes(
     return seg_img
 
 def merge_persistent_modes(labels, saddles, clusters, peaks, thresh):
+    # saddles must be sorted by descending height! as in the output
+    # of assign_modes_...
     n_labels = labels.copy()
+    n_labels = np.zeros_like(labels)
     n_saddles = list()
     n_clusters = dict()
     n_peaks = dict()
     assignments = dict()
+    # make a separate mapping for saddle points that disappear
+    accumulated_saddles = dict( ((m,[]) for m in clusters.keys()) )
     for saddle in saddles:
         h = saddle.elevation
         nb_modes = sorted(saddle.neighbors, key=peaks.get)
@@ -90,7 +94,8 @@ def merge_persistent_modes(labels, saddles, clusters, peaks, thresh):
             assignments[m] = dom
         # if the number of sub_modes is the number of original neighbors
         # minus one, then this is no longer a saddle (all neighboring
-        # clusters were merged)
+        # clusters were merged) -- In this case, then add the saddle
+        # index to the dominant mode cluster
         # NOTE -- if any peaks survive persistence merging at this
         # elevation, then they will never be merged at lower elevations,
         # so the neighboring mode labeling is safe and consistent
@@ -100,18 +105,40 @@ def merge_persistent_modes(labels, saddles, clusters, peaks, thresh):
                 saddle.idx, h, new_nbs + [dom]
                 )
             n_saddles.append(new_saddle)
+        else:
+            accumulated_saddles[dom].append(saddle.idx)
+    # clean up any acausal misassignment redirections -- this may happen
+    # if a is assigned to b, and then later b is assigned to c
+    ks = assignments.keys()
+    vs = assignments.values()
+    for k, v in assignments.items():
+        if v in assignments.keys():
+            real_mode = assignments[v]
+            assignments[k] = real_mode
+            assignments.pop(v)
     # create reverse assignment correspondence
-    survivors = set(assignments.values())
+    survivors = list( set(clusters.keys()).difference(assignments.keys()) )
     sub_modes = dict( ((s, []) for s in survivors) )
     for k, v in assignments.items():
         sub_modes[v].append(k)
     for s in survivors:
-        sub_idc = reduce(lambda x, y: x+y,
-                         (clusters[sub] for sub in sub_modes[s]))
-        np.put(n_labels, sub_idc, s)
-        n_clusters[s] = clusters[s]+sub_idc
+        new_cluster = clusters[s][:]
+        if sub_modes[s]:
+            sub_idc = reduce(lambda x, y: x+y,
+                             (clusters[sub] for sub in sub_modes[s]))
+            new_cluster.extend(sub_idc)
+        saddle_idc = [accumulated_saddles[sub] for sub in sub_modes[s]]
+        saddle_idc.append(accumulated_saddles[s])
+        if any(saddle_idc):
+            saddle_idc = reduce(lambda x, y: x+y, saddle_idc)
+            new_cluster.extend(saddle_idc)
+        new_cluster = sorted(new_cluster)
+        n_clusters[s] = new_cluster
+        np.put(n_labels, new_cluster, s)
         n_peaks[s] = peaks[s]
-
+    # finally, mark -1 for all the remaining saddles
+    s_cluster = [s.idx for s in n_saddles]
+    np.put(n_labels, s_cluster, -1)
     # NOTE: probably don't need to return n_peaks -- this is easily
     # found from the old peaks dictionary and the keys in n_clusters
     return n_labels, n_clusters, n_peaks, n_saddles

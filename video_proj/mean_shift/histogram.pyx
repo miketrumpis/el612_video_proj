@@ -4,7 +4,7 @@ import numpy as np
 cimport numpy as np
 cimport cython
 
-import density_est
+from ..util import image_to_features
 
 @cython.boundscheck(False)
 def nearest_cell_idx(
@@ -92,7 +92,7 @@ def histogram(
     grid_spacing, color_spacing = map(float, (grid_spacing, color_spacing))
     xy_shape = image.shape[:2][::-1] if spatial_features else ()
     n_color_dim = 1 if len(image.shape) < 3 else 3
-    im_vec = density_est.image_to_features(image)
+    im_vec = image_to_features(image)
     color_range = tuple(im_vec[:,2:].ptp(axis=0))
     sigma = (grid_spacing,)*len(xy_shape) + (color_spacing,)*n_color_dim
     # remember im_vec's feature vectors are (x, y, <colors>)
@@ -111,6 +111,13 @@ def histogram(
         cell_centers.append( (edge[:-1] + edge[1:])/2 )
 
     features = im_vec if spatial_features else im_vec[:,2:]
+    # XXX: Binning via this nearest neighbor cell method pushes all
+    # points outside of the grid into the edge cells. This may be
+    # appropriate in assignation, but it creates a distorted PMF
+    # estimate. Better to have a mode where "nearest_cell_idx" returns
+    # OOB indices (or some OOB signal) for points that do not fall
+    # within a cell. Then the default mode will return "safe" indices
+    # into the PMF grid, and can be used for assignation of features
     cdef np.ndarray[np.int64_t, ndim=2] bin_idc = \
         nearest_cell_idx(features, edges)
 
