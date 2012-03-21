@@ -9,7 +9,8 @@ from ..util import image_to_features
 @cython.boundscheck(False)
 def nearest_cell_idx(
         np.ndarray[np.float64_t, ndim=2] x,
-        cell_edges
+        cell_edges,
+        safe_idx=True
         ):
     """
     Find the nearest neighbor index according to the cell edges,
@@ -24,6 +25,10 @@ def nearest_cell_idx(
     cell_edges: list
       ndim-length list of cell edges for some grid space
 
+    safe_idx: bool
+      For any coordinates that do not fall within a cell interval, use
+      the nearest cell. If False, mark any out of bounds coordinates as -1
+
     Returns
     -------
 
@@ -32,7 +37,8 @@ def nearest_cell_idx(
     """
     # cell_edges is a d-length list of axis coordinates corresponding
     # to d-dimensional cell edges
-    cdef int d, r, idx, g_max
+    cdef int d, r, g_max
+    cdef float f_idx
     cdef int nd = x.shape[1]
     cdef int nr = x.shape[0]
     cdef np.ndarray[np.int64_t, ndim=2] g_idx = np.empty((nr, nd), 'l')
@@ -43,13 +49,13 @@ def nearest_cell_idx(
         g_max = len(g_axis)-2
         g_spacing = g_axis[1] - g_axis[0]
         for r in range(nr):
-            idx = <int> ( (x[r,d]-g_edge)/g_spacing )
-            if idx < 0:
-                g_idx[r,d] = 0
-            elif idx > g_max:
-                g_idx[r,d] = g_max
+            f_idx = ( (x[r,d]-g_edge)/g_spacing )
+            if f_idx < 0:
+                g_idx[r,d] = 0 if safe_idx else -1
+            elif f_idx >= g_max+1:
+                g_idx[r,d] = g_max if safe_idx else -1
             else:
-                g_idx[r,d] = idx
+                g_idx[r,d] = <int> f_idx
     return g_idx
 
 @cython.boundscheck(False)
@@ -111,15 +117,12 @@ def histogram(
         cell_centers.append( (edge[:-1] + edge[1:])/2 )
 
     features = im_vec if spatial_features else im_vec[:,2:]
-    # XXX: Binning via this nearest neighbor cell method pushes all
-    # points outside of the grid into the edge cells. This may be
-    # appropriate in assignation, but it creates a distorted PMF
-    # estimate. Better to have a mode where "nearest_cell_idx" returns
-    # OOB indices (or some OOB signal) for points that do not fall
-    # within a cell. Then the default mode will return "safe" indices
-    # into the PMF grid, and can be used for assignation of features
     cdef np.ndarray[np.int64_t, ndim=2] bin_idc = \
-        nearest_cell_idx(features, edges)
+        nearest_cell_idx(features, edges, safe_idx=False)
+    # Out of bounds indices are marked by -1 -- multiply coordinates
+    # to find bad feature vectors
+    in_bounds_features = (np.prod(bin_idc, axis=1) >= 0)
+    bin_idc = bin_idc[in_bounds_features]
 
     # accumulate hits in a flattened array with row-major ordering
     cdef np.ndarray[np.float64_t, ndim=1] b = \
@@ -130,6 +133,7 @@ def histogram(
     cdef np.ndarray[np.int64_t, ndim=1] strides = \
         np.cumprod(np.array(bins[::-1]))
     for k in range(n_feat):
+        s = 0.0
         bin = bin_idc[k,f_dims-1]
         for dim in range(f_dims-1):
             bin += bin_idc[k,f_dims-2-dim]*strides[dim]

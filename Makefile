@@ -1,5 +1,3 @@
-# --yoinked from DIPY, thanks!--
-
 # Simple makefile to quickly access handy build commands for Cython extension
 # code generation.  Note that the actual code to produce the extension lives in
 # the setup.py file, this Makefile is just meant as a command
@@ -9,13 +7,11 @@ PKGDIR=video_proj
 
 all: ext
 
-ext: cell_labels.so histogram.so
-
-html:  ${PKGDIR}/mean_shift/cell_labels.html ${PKGDIR}/mean_shift/histogram.html
-
-cell_labels.so: ${PKGDIR}/mean_shift/cell_labels.c
+ext:
 
 	python setup.py build_ext --inplace
+
+html:  ${PKGDIR}/mean_shift/cell_labels.html ${PKGDIR}/mean_shift/histogram.html
 
 # Phony targets for cleanup and similar uses
 

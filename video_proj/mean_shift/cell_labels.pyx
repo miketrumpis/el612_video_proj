@@ -129,26 +129,31 @@ cdef int cell_neighbors_brute(
         for a1 in range(-1,2):
             if oob(idx[1]+a1, dims[1]):
                 continue
-            for a2 in range(-1,2):
-                if oob(idx[2]+a2, dims[2]):
-                    continue
-                if nd == 3:
-                    nb_idx[0,k] = idx[0]+a0
-                    nb_idx[1,k] = idx[1]+a1
-                    nb_idx[2,k] = idx[2]+a2
-                    k += 1
-                else:
-                    for a3 in range(-1,2):
-                        if oob(idx[3]+a3, dims[3]):
-                            continue
-                        for a4 in range(-1,2):
-                            if oob(idx[4]+a4, dims[4]):
+            if nd == 2:
+                nb_idx[0,k] = idx[0]+a0
+                nb_idx[1,k] = idx[1]+a1
+                k += 1
+            else:
+                for a2 in range(-1,2):
+                    if oob(idx[2]+a2, dims[2]):
+                        continue
+                    if nd == 3:
+                        nb_idx[0,k] = idx[0]+a0
+                        nb_idx[1,k] = idx[1]+a1
+                        nb_idx[2,k] = idx[2]+a2
+                        k += 1
+                    else:
+                        for a3 in range(-1,2):
+                            if oob(idx[3]+a3, dims[3]):
                                 continue
-                            nb_idx[0,k] = idx[0]+a0
-                            nb_idx[1,k] = idx[1]+a1
-                            nb_idx[2,k] = idx[2]+a2
-                            nb_idx[3,k] = idx[3]+a3
-                            nb_idx[4,k] = idx[4]+a4
-                            k += 1
+                            for a4 in range(-1,2):
+                                if oob(idx[4]+a4, dims[4]):
+                                    continue
+                                nb_idx[0,k] = idx[0]+a0
+                                nb_idx[1,k] = idx[1]+a1
+                                nb_idx[2,k] = idx[2]+a2
+                                nb_idx[3,k] = idx[3]+a3
+                                nb_idx[4,k] = idx[4]+a4
+                                k += 1
     return k
 

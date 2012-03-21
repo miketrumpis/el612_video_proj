@@ -62,6 +62,7 @@ def segment_image_from_labeled_modes(
     seg_img.shape = image.shape[:2]
     return seg_img
 
+# XXX! Still a problem here!
 def merge_persistent_modes(labels, saddles, clusters, peaks, thresh):
     # saddles must be sorted by descending height! as in the output
     # of assign_modes_...
@@ -73,69 +74,85 @@ def merge_persistent_modes(labels, saddles, clusters, peaks, thresh):
     assignments = dict()
     # make a separate mapping for saddle points that disappear
     accumulated_saddles = dict( ((m,[]) for m in clusters.keys()) )
+    bordering_saddles = dict( ((m,[]) for m in clusters.keys()) )
+    sub_clusters = dict( ((m,[]) for m in clusters.keys()) )
     for saddle in saddles:
         h = saddle.elevation
-        nb_modes = sorted(saddle.neighbors, key=peaks.get)
+        # filter the saddle neighbors for any reassignments
+        nbs = [assignments.get(m, m) for m in saddle.neighbors]
+        unique_nbs = np.unique(nbs)
+        if len(unique_nbs)==1:
+            # this saddle point has been accumulated and it doesn't
+            # even know it yet
+            accumulated_saddles[unique_nbs[0]].append(saddle.idx)
+            continue
+        # the mode labels sorted by increasing height
+        nb_modes = sorted(unique_nbs, key=peaks.get)
+        # the peaks of the sorted neighboring modes
+        nb_sub_peaks = np.array([peaks[m] for m in nb_modes[:-1]])
         # if any of the n-1 peaks lower than the highest neighbor
         # are dominated by the highest neighbor, then merge clusters
-        nb_sub_peaks = np.array([peaks[m] for m in nb_modes[:-1]])
         sm_idc = np.where((nb_sub_peaks - h) < thresh)[0]
         sub_modes = [nb_modes[m] for m in sm_idc]
         if not len(sub_modes):
-            # still a saddle
-            n_saddles.append(saddle)
+            # still a saddle, but possibly with new neighbors
+            new_saddle = Saddle(saddle.idx, h, list(unique_nbs))
+            n_saddles.append(new_saddle)
             continue
         dom = nb_modes[-1]
-        # if the dominant neighbor already has a re-assignment,
-        # then use that label instead
-        if dom in assignments:
-            dom = assignments[dom]
         for m in sub_modes:
             assignments[m] = dom
+            # reassign sub clusters of mode m
+            for subsub in sub_clusters[m]:
+                assignments[subsub] = dom
+                sub_clusters[dom].append(subsub)
+            # release m from the dominant set
+            sub_clusters.pop(m)
+            # update the bordering saddles
+            bordering_saddles[dom].extend(bordering_saddles[m])
+            bordering_saddles.pop(m)
+            # update the consumed saddles
+            accumulated_saddles[dom].extend(accumulated_saddles[m])
+            accumulated_saddles.pop(m)
+            # finally claim the sub mode
+            sub_clusters[dom].append(m)
         # if the number of sub_modes is the number of original neighbors
         # minus one, then this is no longer a saddle (all neighboring
         # clusters were merged) -- In this case, then add the saddle
         # index to the dominant mode cluster
         # NOTE -- if any peaks survive persistence merging at this
         # elevation, then they will never be merged at lower elevations,
-        # so the neighboring mode labeling is safe and consistent
+        # so the neighboring mode labeling is safe and consistent.
+        # However, the currently dominant mode may disappear
         if len(sub_modes) < len(nb_modes)-1:
             new_nbs = [m for m in nb_modes if m not in sub_modes]
             new_saddle = Saddle(
-                saddle.idx, h, new_nbs + [dom]
+                saddle.idx, h, new_nbs
                 )
             n_saddles.append(new_saddle)
+            ## print dom, bordering_saddles[dom]
+            bordering_saddles[dom].append(new_saddle)
+            ## print dom, bordering_saddles[dom]
         else:
             accumulated_saddles[dom].append(saddle.idx)
-    # clean up any acausal misassignment redirections -- this may happen
-    # if a is assigned to b, and then later b is assigned to c
-    ks = assignments.keys()
-    vs = assignments.values()
-    for k, v in assignments.items():
-        if v in assignments.keys():
-            real_mode = assignments[v]
-            assignments[k] = real_mode
-            assignments.pop(v)
-    # create reverse assignment correspondence
+    ## print assignments
     survivors = list( set(clusters.keys()).difference(assignments.keys()) )
-    sub_modes = dict( ((s, []) for s in survivors) )
-    for k, v in assignments.items():
-        sub_modes[v].append(k)
+    ## print survivors
+    ## return survivors, sub_clusters, bordering_saddles, accumulated_saddles, n_saddles
     for s in survivors:
         new_cluster = clusters[s][:]
-        if sub_modes[s]:
+        if sub_clusters.get(s,[]):
             sub_idc = reduce(lambda x, y: x+y,
-                             (clusters[sub] for sub in sub_modes[s]))
+                             (clusters[sub] for sub in sub_clusters[s]))
             new_cluster.extend(sub_idc)
-        saddle_idc = [accumulated_saddles[sub] for sub in sub_modes[s]]
-        saddle_idc.append(accumulated_saddles[s])
-        if any(saddle_idc):
-            saddle_idc = reduce(lambda x, y: x+y, saddle_idc)
-            new_cluster.extend(saddle_idc)
+        new_cluster.extend(accumulated_saddles.get(s,[]))
         new_cluster = sorted(new_cluster)
         n_clusters[s] = new_cluster
         np.put(n_labels, new_cluster, s)
         n_peaks[s] = peaks[s]
+    for mode, saddles in bordering_saddles.items():
+        for s in saddles:
+            s.neighbors.append(mode)
     # finally, mark -1 for all the remaining saddles
     s_cluster = [s.idx for s in n_saddles]
     np.put(n_labels, s_cluster, -1)

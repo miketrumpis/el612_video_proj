@@ -16,6 +16,17 @@ def image_to_features(image):
     features = np.c_[xx.ravel(), yy.ravel(), image.reshape(Ny*Nx, n_color_dim)]
     return features
 
+def contiguous_labels(labels, clusters):
+    old_labels = clusters.keys()
+    new_labels = dict(zip(range(1,len(old_labels)+1), old_labels))
+    relabel = labels.copy()
+    for nk, ok in new_labels.items():
+        if nk == ok:
+            continue
+        old_cluster = clusters[ok]
+        np.put(relabel, old_cluster, nk)
+    return relabel
+
 def yuv_image(b_arr, Nx, Ny, yuv_mode='420'):
     """
     Convert an array of bytes containing YUV information into an

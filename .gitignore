@@ -1,3 +1,5 @@
+*.pdf
+*.html
 *.pyc
 *.c
 *.so
