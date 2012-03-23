@@ -133,6 +133,9 @@ def resolve_label_boundaries(
         # and the approximate feature vector? guess we need lookup
         fvec = np.array([ (d[k] + d[k+1])/2.0 for d,k in zip(cell_edges, x) ])
         n_iter = 0
+        # -- replace following with classifier built on
+        #    multi-linear interpolation over the index grid
+        #    and density manifold --
         while walking and n_iter < max_iter:
             if use_ellipse:
                 ball = quasi_elliptical_ball(btree, fvec, sigma, c_sigma)

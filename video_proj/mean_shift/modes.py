@@ -5,8 +5,17 @@ from cell_labels import Saddle
 from histogram import nearest_cell_idx
 from ..util import image_to_features
 
-def smooth_density(p, sigma, **gaussian_kws):
-    return ndimage.gaussian_filter(p, sigma, **gaussian_kws)
+def smooth_density(p, sigma, accum=None, **gaussian_kws):
+    p = ndimage.gaussian_filter(p, sigma, **gaussian_kws)
+    if accum is not None:
+        # filter vector valued function accum coordinate-wise
+        n_coords = accum.shape[-1]
+        for n in xrange(n_coords):
+            accum[...,n] = ndimage.gaussian_filter(
+                accum[...,n], sigma, **gaussian_kws
+                )
+        return p, accum
+    return p
 
 def cell_neighbors(c_idx, dims):
     """

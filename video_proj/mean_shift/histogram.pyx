@@ -1,5 +1,6 @@
 """ -*- python -*- file
 """
+# cython: profile=True
 import numpy as np
 cimport numpy as np
 cimport cython
@@ -88,9 +89,13 @@ def histogram(
     Returns
     -------
 
-    b: ndarray, 3- or 5-D
-      The induced (unnormalized) density function over spatio-intensity
-      space (X,Y,I), or spatio-color space (X,Y,<color dims>)
+    b: ndarray, 1-, 3- or 5-D
+      The feature vector count in a regularly gridded field of cells (bins).
+      The dimensionality may be: intensity only (1D); colors only (3D);
+      spatio-intensity (3D); spatio-color (5D).
+
+   accum: ndarray, 1-, 3- or 5-D
+      The summed feature vectors discovered at each bin.
 
     """
     if not color_spacing:
@@ -116,27 +121,38 @@ def histogram(
     for edge in edges:
         cell_centers.append( (edge[:-1] + edge[1:])/2 )
 
-    features = im_vec if spatial_features else im_vec[:,2:]
+    cdef np.ndarray[np.float64_t, ndim=2] features = \
+        im_vec if spatial_features else im_vec[:,2:]
     cdef np.ndarray[np.int64_t, ndim=2] bin_idc = \
         nearest_cell_idx(features, edges, safe_idx=False)
     # Out of bounds indices are marked by -1 -- multiply coordinates
     # to find bad feature vectors
     in_bounds_features = (np.prod(bin_idc, axis=1) >= 0)
     bin_idc = bin_idc[in_bounds_features]
+    features = features[in_bounds_features]
+
+    cdef int n_feat = features.shape[0]
+    cdef int f_dims = features.shape[1]
+    cdef int k, m, bin
 
     # accumulate hits in a flattened array with row-major ordering
     cdef np.ndarray[np.float64_t, ndim=1] b = \
         np.zeros( (np.prod(bins),), 'd' )
-    cdef int k, bin, dim
-    cdef int n_feat = bin_idc.shape[0]
-    cdef int f_dims = bin_idc.shape[1]
+    # accumulate summed feature vectors similarly
+    cdef np.ndarray[np.float64_t, ndim=2] accum = \
+        np.zeros( (np.prod(bins), f_dims), 'd' )
+    # define the strides for flat indexing
     cdef np.ndarray[np.int64_t, ndim=1] strides = \
         np.cumprod(np.array(bins[::-1]))
+
     for k in range(n_feat):
-        s = 0.0
         bin = bin_idc[k,f_dims-1]
-        for dim in range(f_dims-1):
-            bin += bin_idc[k,f_dims-2-dim]*strides[dim]
+        for m in range(f_dims-1):
+            bin += bin_idc[k,f_dims-2-m]*strides[m]
         b[bin] += 1
-    
-    return b.reshape(tuple(bins)), cell_centers, edges
+        for m in range(f_dims):
+            accum[bin,m] += features[k,m]
+    # XXX: I think it's safe to remove cell_centers from the returned items
+    return (b.reshape(tuple(bins)),
+            accum.reshape(tuple(bins)+(f_dims,)),
+            edges)

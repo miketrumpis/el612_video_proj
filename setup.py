@@ -15,7 +15,7 @@ except AttributeError:
     numpy_include_dirs = numpy.get_include()
 
 
-dirs = list(numpy_include_dirs)
+dirs = list(numpy_include_dirs) + ['video_proj']
 ## dirs.extend(Cython.__path__)
 ## dirs.append('.')
 
@@ -31,12 +31,24 @@ histogram = Extension(
     include_dirs = dirs, 
     extra_compile_args=['-O3']
     )
+histogram = Extension(
+    'video_proj.mean_shift.grid_mean_shift',
+    ['video_proj/mean_shift/grid_mean_shift.pyx'], 
+    include_dirs = dirs, 
+    extra_compile_args=['-O3']
+    )
+indexing = Extension(
+    'video_proj.indexing',
+    ['video_proj/indexing.pyx'], 
+    include_dirs = dirs, 
+    extra_compile_args=['-O3']
+    )
 
 if __name__=='__main__':
     setup(
         name = 'video_proj',
         version = '1.0',
         packages = ['video_proj', 'video_proj.mean_shift'],
-        ext_modules = [ cell_label, histogram ],
+        ext_modules = [ cell_label, histogram, indexing ],
         cmdclass = {'build_ext': build_ext}
     )

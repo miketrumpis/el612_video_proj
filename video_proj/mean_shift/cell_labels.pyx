@@ -5,6 +5,9 @@ import numpy as np
 cimport numpy as np
 cimport cython
 
+from video_proj.indexing cimport multi_idx, flatten_idc, oob, idx_type
+from ..indexing import py_idx_type as pidx_t
+
 # a simple container
 class Saddle(object):
     def __init__(self, idx, elevation, neighbors):
@@ -24,18 +27,21 @@ def assign_modes_by_density(
     clusters = dict()
     peak_by_mode = dict()
     saddles = list()
-    cdef tuple dims = D.shape
+    ## cdef tuple dims = D.shape
+    cdef np.ndarray[idx_type, ndim=1] dims = np.array(D.shape, dtype=pidx_t)
     cdef int nd = len(dims)
     cdef np.ndarray[np.float64_t, ndim=1] Df = D.ravel()
-    cdef np.ndarray[np.int64_t, ndim=1] gs = np.argsort(Df)
+    cdef np.ndarray[idx_type, ndim=1] gs = np.argsort(Df)
     cdef np.ndarray[np.int32_t, ndim=1] labels = np.zeros((len(gs),), 'i')
     cdef np.ndarray[np.int32_t, ndim=1] nbs, pos_nbs
-    cdef np.ndarray[np.int64_t, ndim=1] pm = np.array([-1, 1], 'l')
-    cdef np.ndarray[np.int64_t, ndim=1] nb_idx
-    cdef np.ndarray[np.int64_t, ndim=2] nb_idx_arr = np.empty((nd, 3**nd), 'l')
-    cdef np.ndarray[np.int64_t, ndim=1] g_nd_arr = np.empty((nd,), 'l')
-    cdef int x, i, g
-    cdef list g_nd = [0]*nd
+    cdef np.ndarray[idx_type, ndim=1] pm = np.array([-1, 1], dtype=pidx_t)
+    cdef np.ndarray[idx_type, ndim=1] nb_idx
+    cdef np.ndarray[idx_type, ndim=2] nb_idx_arr = \
+        np.empty((nd, 3**nd), dtype=pidx_t)
+    cdef np.ndarray[idx_type, ndim=1] g_nd = np.empty((nd,), dtype=pidx_t)
+    cdef int x, i
+    cdef idx_type g
+    ## cdef list g_nd = [0]*nd
     cdef np.int32_t test, next_label = 1
     for x in xrange(len(gs)-1, -1, -1):
         if x%1000 == 0:
@@ -46,11 +52,11 @@ def assign_modes_by_density(
         if nd == 1:
             nbs = np.take(labels, pm+g, mode='clip')
         else:
-            multi_idx(g, dims, g_nd)
-            for i in range(nd):
-                g_nd_arr[i] = g_nd[i]
-            num_nb = cell_neighbors_brute(g_nd_arr, dims, nb_idx_arr)
-            nb_idx = flatten_idx(nb_idx_arr[:,:num_nb], dims)
+            multi_idx(g, <idx_type*>dims.data, nd, <idx_type*>g_nd.data)
+            ## for i in range(nd):
+            ##     g_nd_arr[i] = g_nd[i]
+            num_nb = cell_neighbors_brute(g_nd, dims, nb_idx_arr)
+            nb_idx = flatten_idc(nb_idx_arr[:,:num_nb], dims)
             nbs = np.take(labels, nb_idx)
         pos_idx = np.where(nbs>0)[0]
         pos_nbs = np.take(nbs, pos_idx)
@@ -78,47 +84,11 @@ def assign_modes_by_density(
     labels_nd = np.reshape(labels, dims)
     return labels_nd, clusters, peak_by_mode, saddles
 
-def flatten_idx_passthru(np.ndarray[np.int64_t, ndim=2] idx, tuple dims):
-    return flatten_idx(idx, dims)
-
-def multi_idx_passthru(int flat_idx, tuple dims):
-    idx = [0]*len(dims)
-    multi_idx(flat_idx, dims, idx)
-    return idx
-
-@cython.boundscheck(False)
-cdef np.ndarray[np.int64_t, ndim=1] flatten_idx(
-    np.ndarray[np.int64_t, ndim=2] idx,
-    tuple dims
-    ):
-    cdef int nd = len(dims)
-    cdef int n_idx = idx.shape[1]
-    cdef int j, k, stride=1
-    cdef np.ndarray[np.int64_t, ndim=1] f_idx = np.zeros((n_idx,), 'l')
-    for k in range(nd-1, -1, -1):
-        for j in range(n_idx):
-            f_idx[j] += idx[k,j] * stride
-        stride *= dims[k]
-    return f_idx
-
-cdef inline void multi_idx(int flat_idx, tuple dims, list idx):
-    cdef int k, nd = len(dims)
-    for k in range(nd-1, -1, -1):
-        idx[k] = flat_idx % dims[k]
-        flat_idx -= idx[k]
-        flat_idx = <int> (flat_idx / dims[k])
-    return
-
-cdef inline int oob(np.int64_t i, int N):
-    if (i < 0) or (i >= N):
-        return 1
-    return 0
-
 @cython.boundscheck(False)
 cdef int cell_neighbors_brute(
-    np.ndarray[np.int64_t, ndim=1] idx,
-    tuple dims,
-    np.ndarray[np.int64_t, ndim=2] nb_idx
+    np.ndarray[idx_type, ndim=1] idx,
+    np.ndarray[idx_type, ndim=1] dims,
+    np.ndarray[idx_type, ndim=2] nb_idx
     ):
     cdef int k = 0        
     cdef np.int64_t a0, a1, a2, a3, a4
