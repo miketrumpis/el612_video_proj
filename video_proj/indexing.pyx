@@ -82,7 +82,7 @@ def multi_idx_p(int flat_idx, tuple dims):
         )
     return idx
 
-cdef inline idx_type clamp(float n, idx_type mn, idx_type mx):
+cdef inline idx_type clamp(double n, idx_type mn, idx_type mx):
     cdef idx_type i = <idx_type> n
     if i < mn:
         return mn

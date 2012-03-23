@@ -40,14 +40,14 @@ def multilinear_interpolation(np.ndarray[np.float64_t, ndim=1] p, grid):
     cdef np.ndarray[np.float64_t, ndim=2] interp_coefs = \
         np.empty((grid_domain_d, 2), 'd')
 
-    cdef float alpha
+    cdef double alpha
     cdef idx_type n0, n1
     cdef int d, n
 
     for d in range(grid_domain_d):
         n0 = clamp(p[d], 0, dims[d]-1)
         n1 = clamp(p[d]+1, 0, dims[d]-1)
-        alpha = 1.0 - (p[d] - <float>n0)
+        alpha = 1.0 - (p[d] - <double>n0)
         nodes[d,0] = n0
         nodes[d,1] = n1
         interp_coefs[d,0] = alpha

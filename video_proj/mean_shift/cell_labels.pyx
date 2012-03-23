@@ -20,6 +20,47 @@ class Saddle(object):
             self.idx, self.elevation, self.neighbors
             )
 
+cdef class Mode:
+    cdef public idx_type idx
+    cdef public double elevation
+    cdef public int label
+
+    cdef public list neighbors
+    
+    def __init__(self, idx, elevation, label):
+        self.idx = idx
+        self.elevation = elevation
+        self.label = label
+
+    def __repr__(self):
+        return 'index: %d, elevation: %1.2f, label %d, neighbors: %s'%(
+            self.idx, self.elevation, self.label, self.neighbors
+            )
+
+# XXX: this will be merged into active code
+cdef class NewSaddle:
+    cdef public idx_type idx
+    cdef public double elevation, persistence
+    cdef public Mode sub, dom
+
+    def __init__(self, idx, elevation, m1, m2):
+        if m1.elevation > m2.elevation:
+            self.sub = m2
+            self.dom = m1
+        else:
+            self.sub = m1
+            self.dom = m2
+        self.persistence = self.sub.elevation - elevation
+        self.elevation = elevation
+        self.idx = idx
+
+    def __repr__(self):
+        s = 'index: %d, elevation: %1.2f, persistence %1.2f\n'%(
+            self.idx, self.elevation, self.persistence
+            )
+        s = s+'Sub Mode: %s\nDom Mode: %s'%(self.sub, self.dom)
+        return s
+
 # XXX: should consider pre-masking out zero occupancy or density cells
 @cython.boundscheck(False)
 def assign_modes_by_density(

@@ -55,7 +55,7 @@ def nearest_cell_idx(
     # cell_edges is a d-length list of axis coordinates corresponding
     # to d-dimensional cell edges
     cdef int d, r, g_max
-    cdef float f_idx
+    cdef double f_idx
     cdef int nd = x.shape[1]
     cdef int nr = x.shape[0]
     cdef np.ndarray[idx_type, ndim=2] g_idx = \
