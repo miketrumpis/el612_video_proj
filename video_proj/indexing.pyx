@@ -8,6 +8,7 @@ import numpy as np
 
 py_idx_type = np.int64
 
+@cython.boundscheck(False)
 cdef inline void multi_idx(
      idx_type flat_idx, idx_type *dims, int nd, idx_type *idx
      ):

@@ -168,4 +168,27 @@ def merge_persistent_modes(labels, saddles, clusters, peaks, thresh):
     # NOTE: probably don't need to return n_peaks -- this is easily
     # found from the old peaks dictionary and the keys in n_clusters
     return n_labels, n_clusters, n_peaks, n_saddles
-            
+
+
+def threshold_clusters(clusters, min_cells):
+    """
+    Prune the clusters by rejecting modes of fewer than min_cells
+    grid points. Return the newly unclassified points.
+
+    Note
+    ----
+
+    The clusters dictionary is updated by this procedure
+
+    """
+    unclassified = []
+    pop_list = []
+    for label, group in clusters.items():
+	if len(group) < min_cell:
+            unclassified.extend(group)
+            pop_list.append(label)
+    for label in pop_list:
+        clusters.pop(label)
+    return unclassified
+		
+		    

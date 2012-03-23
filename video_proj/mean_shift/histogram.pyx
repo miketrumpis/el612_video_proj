@@ -4,14 +4,30 @@
 import numpy as np
 cimport numpy as np
 cimport cython
+from video_proj.indexing cimport idx_type
 
 from ..util import image_to_features
+from ..indexing import py_idx_type as pidx_t
+
+@cython.boundscheck(False)
+def normalized_feature(np.ndarray[np.float64_t, ndim=1] f, list cell_edges):
+    cdef int f_size = len(f)
+    cdef int d
+    cdef np.ndarray[np.float64_t, ndim=1] nf = np.empty_like(f)
+    cdef np.ndarray[np.float64_t, ndim=1] g_axis
+    cdef np.float64_t g_edge, g_spacing
+    for d in range(f_size):
+        g_axis = cell_edges[d]
+        g_edge = g_axis[0]
+        g_spacing = g_axis[1] - g_axis[0]
+        nf[d] = (f[d] - g_edge)/g_spacing
+    return nf
 
 @cython.boundscheck(False)
 def nearest_cell_idx(
         np.ndarray[np.float64_t, ndim=2] x,
-        cell_edges,
-        safe_idx=True
+        list cell_edges,
+        safe_idx=True,
         ):
     """
     Find the nearest neighbor index according to the cell edges,
@@ -42,7 +58,9 @@ def nearest_cell_idx(
     cdef float f_idx
     cdef int nd = x.shape[1]
     cdef int nr = x.shape[0]
-    cdef np.ndarray[np.int64_t, ndim=2] g_idx = np.empty((nr, nd), 'l')
+    cdef np.ndarray[idx_type, ndim=2] g_idx = \
+        np.empty((nr, nd), dtype=pidx_t)
+    cdef np.ndarray[np.float64_t, ndim=1] g_axis
     cdef np.float64_t g_edge, g_spacing
     for d in range(nd):
         g_axis = cell_edges[d]
@@ -56,7 +74,7 @@ def nearest_cell_idx(
             elif f_idx >= g_max+1:
                 g_idx[r,d] = g_max if safe_idx else -1
             else:
-                g_idx[r,d] = <int> f_idx
+                g_idx[r,d] = <idx_type> f_idx
     return g_idx
 
 @cython.boundscheck(False)
@@ -123,6 +141,7 @@ def histogram(
 
     cdef np.ndarray[np.float64_t, ndim=2] features = \
         im_vec if spatial_features else im_vec[:,2:]
+    cdef np.ndarray[np.float64_t, ndim=1] nf
     cdef np.ndarray[np.int64_t, ndim=2] bin_idc = \
         nearest_cell_idx(features, edges, safe_idx=False)
     # Out of bounds indices are marked by -1 -- multiply coordinates
@@ -150,8 +169,9 @@ def histogram(
         for m in range(f_dims-1):
             bin += bin_idc[k,f_dims-2-m]*strides[m]
         b[bin] += 1
+        nf = normalized_feature(features[k], edges)
         for m in range(f_dims):
-            accum[bin,m] += features[k,m]
+            accum[bin,m] += nf[m]
     # XXX: I think it's safe to remove cell_centers from the returned items
     return (b.reshape(tuple(bins)),
             accum.reshape(tuple(bins)+(f_dims,)),

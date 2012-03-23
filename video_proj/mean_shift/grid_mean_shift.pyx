@@ -17,6 +17,7 @@ def classify_point(nfvec, labels, density):
     # of the density manifold as the point density
     pass
 
+@cython.boundscheck(False)
 def multilinear_interpolation(np.ndarray[np.float64_t, ndim=1] p, grid):
     # p is a "fractional index" -- i.e., it has been normalized
     # by the grid edge lengths and offset by the grid origin
@@ -67,6 +68,7 @@ def multilinear_interpolation(np.ndarray[np.float64_t, ndim=1] p, grid):
 
         alpha = 1.0
         for d in range(grid_domain_d):
+            r[d] = 0
             # cube_corners[n,d] either 0 or 1
             corner[d] = nodes[d, cube_corners[n,d+col_off]]
             alpha *= interp_coefs[d, cube_corners[n,d+col_off]]

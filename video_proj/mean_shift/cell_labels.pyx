@@ -1,6 +1,6 @@
+# cython: profile=True
 """ -*- python -*- file
 """
-# cython: profile=True
 import numpy as np
 cimport numpy as np
 cimport cython
@@ -20,6 +20,7 @@ class Saddle(object):
             self.idx, self.elevation, self.neighbors
             )
 
+# XXX: should consider pre-masking out zero occupancy or density cells
 @cython.boundscheck(False)
 def assign_modes_by_density(
         D, np.int32_t boundary=-1
@@ -53,8 +54,6 @@ def assign_modes_by_density(
             nbs = np.take(labels, pm+g, mode='clip')
         else:
             multi_idx(g, <idx_type*>dims.data, nd, <idx_type*>g_nd.data)
-            ## for i in range(nd):
-            ##     g_nd_arr[i] = g_nd[i]
             num_nb = cell_neighbors_brute(g_nd, dims, nb_idx_arr)
             nb_idx = flatten_idc(nb_idx_arr[:,:num_nb], dims)
             nbs = np.take(labels, nb_idx)
