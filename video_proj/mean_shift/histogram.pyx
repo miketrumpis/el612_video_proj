@@ -11,19 +11,10 @@ from ..indexing import py_idx_type as pidx_t
 
 # XXX: This needs to be vectorized! calling it for Ny*Nx features
 # swamps histogram -- in this sense, should just roll it into nearest_cell_idx
-@cython.boundscheck(False)
-def normalized_feature(np.ndarray[np.float64_t, ndim=1] f, list cell_edges):
-    cdef int f_size = len(f)
-    cdef int d
-    cdef np.ndarray[np.float64_t, ndim=1] nf = np.empty_like(f)
-    cdef np.ndarray[np.float64_t, ndim=1] g_axis
-    cdef np.float64_t g_edge, g_spacing
-    for d in range(f_size):
-        g_axis = cell_edges[d]
-        g_edge = g_axis[0]
-        g_spacing = g_axis[1] - g_axis[0]
-        nf[d] = (f[d] - g_edge)/g_spacing
-    return nf
+def normalized_feature(f, list cell_edges):
+    if len(f.shape) < 2:
+        return nearest_cell_idx(f[None,:], cell_edges, real_idx=True)[0]
+    return nearest_cell_idx(f, cell_edges, real_idx=True)
 
 # XXX: why isn't this completely vectorized in Numpy? This is just
 # a 1D affine transformation of each coordinate
@@ -32,6 +23,7 @@ def nearest_cell_idx(
         np.ndarray[np.float64_t, ndim=2] x,
         list cell_edges,
         safe_idx=True,
+        real_idx=False
         ):
     """
     Find the nearest neighbor index according to the cell edges,
@@ -50,6 +42,11 @@ def nearest_cell_idx(
       For any coordinates that do not fall within a cell interval, use
       the nearest cell. If False, mark any out of bounds coordinates as -1
 
+    real_idx: bool
+      If true, return the real valued "fractional" index corresponding
+      to each feature. In other words, this is the normalized feature
+      vector.
+
     Returns
     -------
 
@@ -62,10 +59,14 @@ def nearest_cell_idx(
     cdef double f_idx
     cdef int nd = x.shape[1]
     cdef int nr = x.shape[0]
-    cdef np.ndarray[idx_type, ndim=2] g_idx = \
-        np.empty((nr, nd), dtype=pidx_t)
+    cdef np.ndarray[idx_type, ndim=2] g_idx
+    cdef np.ndarray[np.float64_t, ndim=2] r_idx
     cdef np.ndarray[np.float64_t, ndim=1] g_axis
     cdef np.float64_t g_edge, g_spacing
+    if real_idx:
+        r_idx = np.empty((nr, nd), dtype='d')
+    else:
+        g_idx = np.empty((nr, nd), dtype=pidx_t)
     for d in range(nd):
         g_axis = cell_edges[d]
         g_edge = g_axis[0]
@@ -73,13 +74,19 @@ def nearest_cell_idx(
         g_spacing = g_axis[1] - g_axis[0]
         for r in range(nr):
             f_idx = ( (x[r,d]-g_edge)/g_spacing )
-            if f_idx < 0:
-                g_idx[r,d] = 0 if safe_idx else -1
-            elif f_idx >= g_max+1:
-                g_idx[r,d] = g_max if safe_idx else -1
+            if real_idx:
+                r_idx[r,d] = f_idx
             else:
-                g_idx[r,d] = <idx_type> f_idx
-    return g_idx
+                if f_idx < 0:
+                    g_idx[r,d] = 0 if safe_idx else -1
+                elif f_idx >= g_max+1:
+                    g_idx[r,d] = g_max if safe_idx else -1
+                else:
+                    g_idx[r,d] = <idx_type> f_idx
+    if real_idx:
+        return r_idx
+    else:
+        return g_idx
 
 @cython.boundscheck(False)
 def histogram(
@@ -148,7 +155,8 @@ def histogram(
 
     cdef np.ndarray[np.float64_t, ndim=2] features = \
         im_vec if spatial_features else im_vec[:,2:]
-    cdef np.ndarray[np.float64_t, ndim=1] nf
+    cdef np.ndarray[np.float64_t, ndim=2] nf = \
+        normalized_feature(features, edges)
     cdef np.ndarray[np.int64_t, ndim=2] bin_idc = \
         nearest_cell_idx(features, edges) #, safe_idx=False)
     # Out of bounds indices are marked by -1 -- multiply coordinates
@@ -176,9 +184,8 @@ def histogram(
         for m in range(f_dims-1):
             bin += bin_idc[k,f_dims-2-m]*strides[m]
         b[bin] += 1
-        nf = normalized_feature(features[k], edges)
         for m in range(f_dims):
-            accum[bin,m] += nf[m]
+            accum[bin,m] += nf[k,m]
 
     return (b.reshape(tuple(bins)),
             accum.reshape(tuple(bins)+(f_dims,)),
