@@ -1,58 +1,13 @@
 from __future__ import division
 import numpy as np
 import matplotlib.pyplot as pp
-import video_proj.mean_shift.modes as modes
-import video_proj.mean_shift.mean_shift_tools as ms_tools
+import video_proj.mean_shift.classification as cls
 import video_proj.colors as colors
 import video_proj.util as ut
 import video_proj.mean_shift.histogram as histogram
-import video_proj.mean_shift.cell_labels as cell_labels
+import video_proj.mean_shift.topological as topo
 
 import PIL.Image as PImage
-## # swan
-## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/test/8068.jpg')
-## iname = 'swan'
-# llama (HARD!)
-img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/test/6046.jpg')
-iname = 'llama'
-## # starfish
-## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/12003.jpg')
-## iname = 'starfish'
-## # monkey
-## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/16052.jpg')
-## iname = 'monkey'
-
-
-img = np.array(img)
-f = pp.figure()
-pp.imshow(img)
-f.savefig(iname+'_raw.pdf')
-f.axes[0].xaxis.set_visible(False); f.axes[0].yaxis.set_visible(False)
-## img = colors.rgb2lab(img)
-## img = img[...,0].squeeze()
-c_sigma = 5
-spatial = True
-s_sigma = 25.0
-0/0
-features = ut.image_to_features(img)
-if not spatial:
-    features = features[:,2:]
-
-b, accum, edges = histogram.histogram(
-    img, s_sigma, spatial_features=spatial, color_spacing=c_sigma
-    )
-p, mu = modes.smooth_density(b, 1, accum=accum, mode='constant')
-## zmask = (p>5e-1)
-zmask = (b>0)
-zmask = zmask.astype('B')
-## del b
-## del accum
-sr_grid = np.concatenate( (mu, p[...,None]), axis=-1).copy()
-
-## zmask = (p==0)
-## min_p = p[zmask].min()
-## p[zmask] = 0.9*min_p
-persistence_factor = np.log(p[zmask.astype('bool')]).ptp() * .005
 
 def plot_masked_segmap(s_img):
     f = pp.figure()
@@ -62,74 +17,64 @@ def plot_masked_segmap(s_img):
     pp.colorbar()
     f.axes[0].xaxis.set_visible(False); f.axes[0].yaxis.set_visible(False)
     return f
-0/0
-# Find non-iterative labeling via topographical analysis of log(P)
-(labels,
- clusters,
- peaks,
- saddles) = cell_labels.assign_modes_by_density(np.log(p), zmask)
-## cluster_cutoff = int(0.005 * labels.size + 0.5)
-## falsely_labeled = modes.threshold_clusters(
-##     clusters, peaks, saddles, cluster_cutoff
-##     )
-## np.put(labels, falsely_labeled, -1)
-# also need to 
 
-## 0/0
-s_img0 = modes.segment_image_from_labeled_modes(
-    img, labels, edges, spatial_features=spatial
+def plot_masked_centroid_image(image, segmap):
+    c_image = colors.quantize_from_centroid(image, segmap)
+    f = pp.figure()
+    mask = np.ones(c_image.shape, 'bool')
+    mask.shape = (-1, 3)
+    mask[segmap.ravel() <= 0] = 0
+    pp.imshow(np.ma.MaskedArray(c_image, mask=mask))
+    f.axes[0].xaxis.set_visible(False); f.axes[0].yaxis.set_visible(False)
+    return f
+
+## # swan
+## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/test/8068.jpg')
+## iname = 'swan'
+## c_sigma = 10; s_sigma = 30; p_thresh = 0.05
+## # llama (HARD!)
+## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/test/6046.jpg')
+## iname = 'llama'
+## c_sigma = 5.0; s_sigma = 40.0; p_thresh = 0.3
+# starfish
+img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/12003.jpg')
+iname = 'starfish'
+c_sigma = 10.0; s_sigma = 50.0; p_thresh = 0.0
+# monkey
+## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/16052.jpg')
+## iname = 'monkey'
+## c_sigma = 10.0; s_sigma = 5.0; p_thresh = 0.17
+
+rgb_img = np.array(img)
+f = pp.figure()
+pp.imshow(rgb_img)
+f.savefig(iname+'_raw.pdf')
+f.axes[0].xaxis.set_visible(False); f.axes[0].yaxis.set_visible(False)
+img = colors.rgb2lab(rgb_img)
+## img = img[...,0].squeeze()
+spatial = True
+
+m_seek = topo.ModeSeeking(
+    spatial_bw = s_sigma, color_bw = c_sigma
     )
+classifier = m_seek.train_on_image(img, bin_sigma = 1.25)
+
+s_img0 = classifier.classify(img, refined=False, cluster_size_threshold=50)
 print 'partial segmentation : %d / %d pixels labeled'%((s_img0>=0).sum(),
                                                        s_img0.size)
-f = plot_masked_segmap(s_img0)
+f = plot_masked_centroid_image(rgb_img, s_img0)
 f.savefig(iname+'_initial.pdf')
+f = plot_masked_segmap(s_img0)
+f.savefig(iname+'_initial_labels.pdf')
+pp.show()
 
-# Resolve boundaries in the image with mean shift
-s_img1 = s_img0.copy()
-ms_tools.resolve_segmentation_boundaries(
-    s_img1, features, sr_grid, labels, edges
-    )
+classifier = m_seek.persistence_merge(p_thresh)
+classifier.refine_labels()
+s_img1 = classifier.classify(img, refined=False, cluster_size_threshold=50)
+print 'partial segmentation : %d / %d pixels labeled'%((s_img1>=0).sum(),
+                                                       s_img1.size)
+f = plot_masked_centroid_image(rgb_img, s_img1)
+f.savefig(iname+'_persistence_refined_model.pdf')
 f = plot_masked_segmap(s_img1)
-f.savefig(iname+'_pixel_resolved_from_initial.pdf')
-
-# perform persistence based merging
-(nlabels,
- nclusters,
- npeak_by_mode,
- nsaddles) = modes.merge_persistent_modes(
-        labels, saddles, clusters, peaks, 1
-     )
-clabels = ut.contiguous_labels(nlabels, nclusters)
- 
-s_img2 = modes.segment_image_from_labeled_modes(
-    img, clabels, edges, spatial_features=spatial
-    )
-print 'partial segmentation (merged) : %d / %d pixels labeled'%(
-    (s_img2>0).sum(), s_img2.size
-    )
-f = plot_masked_segmap(s_img2)
-f.savefig(iname+'_persistence.pdf')
-
-# refine these boundaries in the image with mean shift
-s_img3 = s_img2.copy()
-ms_tools.resolve_segmentation_boundaries(
-    s_img3, features, sr_grid, clabels, edges
-    )
-f = plot_masked_segmap(s_img3)
-f.savefig(iname+'_pixel_resolved_from_merged.pdf')
-
-
-# now to refine the labels and compare that to the pixel-refinement
-
-ms_tools.resolve_label_boundaries(
-    clabels, p, mu, edges
-    )
-s_img4 = modes.segment_image_from_labeled_modes(
-    img, clabels, edges, spatial_features=spatial
-    )
-print 'partial segmentation (refined): %d / %d pixels labeled'%(
-    (s_img4>0).sum(), s_img4.size
-    )
-f = plot_masked_segmap(s_img4)
-f.savefig(iname+'_refined.pdf')
+f.savefig(iname+'_persistence_refined_model_labels.pdf')
 pp.show()
