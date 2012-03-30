@@ -1,8 +1,8 @@
 import numpy as np
 import scipy.ndimage as ndimage
 
-from cell_labels import Saddle
-from histogram import nearest_cell_idx
+## from video_proj.mean_shift.cell_labels import Saddle
+from video_proj.mean_shift.histogram import nearest_cell_idx
 from ..util import image_to_features
 
 def smooth_density(p, sigma, accum=None, **gaussian_kws):
@@ -170,7 +170,7 @@ def merge_persistent_modes(labels, saddles, clusters, peaks, thresh):
     return n_labels, n_clusters, n_peaks, n_saddles
 
 
-def threshold_clusters(clusters, min_cells):
+def threshold_clusters(clusters, peaks, saddles, min_cells):
     """
     Prune the clusters by rejecting modes of fewer than min_cells
     grid points. Return the newly unclassified points.
@@ -184,11 +184,14 @@ def threshold_clusters(clusters, min_cells):
     unclassified = []
     pop_list = []
     for label, group in clusters.items():
-	if len(group) < min_cell:
+	if len(group) < min_cells:
             unclassified.extend(group)
             pop_list.append(label)
+    keep_saddles = list()
     for label in pop_list:
         clusters.pop(label)
+	peaks.pop(label)
+    
     return unclassified
 		
 		    

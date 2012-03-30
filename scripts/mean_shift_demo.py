@@ -12,14 +12,15 @@ import PIL.Image as PImage
 ## # swan
 ## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/test/8068.jpg')
 ## iname = 'swan'
-## # llama (HARD!)
-## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/test/6046.jpg')
+# llama (HARD!)
+img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/test/6046.jpg')
+iname = 'llama'
 ## # starfish
 ## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/12003.jpg')
 ## iname = 'starfish'
-# monkey
-img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/16052.jpg')
-iname = 'monkey'
+## # monkey
+## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/16052.jpg')
+## iname = 'monkey'
 
 
 img = np.array(img)
@@ -27,12 +28,12 @@ f = pp.figure()
 pp.imshow(img)
 f.savefig(iname+'_raw.pdf')
 f.axes[0].xaxis.set_visible(False); f.axes[0].yaxis.set_visible(False)
-img = colors.rgb2lab(img)
+## img = colors.rgb2lab(img)
 ## img = img[...,0].squeeze()
-c_sigma = 15
+c_sigma = 5
 spatial = True
 s_sigma = 25.0
-
+0/0
 features = ut.image_to_features(img)
 if not spatial:
     features = features[:,2:]
@@ -41,15 +42,17 @@ b, accum, edges = histogram.histogram(
     img, s_sigma, spatial_features=spatial, color_spacing=c_sigma
     )
 p, mu = modes.smooth_density(b, 1, accum=accum, mode='constant')
-del b
-del accum
+## zmask = (p>5e-1)
+zmask = (b>0)
+zmask = zmask.astype('B')
+## del b
+## del accum
 sr_grid = np.concatenate( (mu, p[...,None]), axis=-1).copy()
 
-zmask = (p==0)
-min_p = p[~zmask].min()
-p[zmask] = 0.9*min_p
-
-persistence_factor = np.log(p).ptp() * .01
+## zmask = (p==0)
+## min_p = p[zmask].min()
+## p[zmask] = 0.9*min_p
+persistence_factor = np.log(p[zmask.astype('bool')]).ptp() * .005
 
 def plot_masked_segmap(s_img):
     f = pp.figure()
@@ -59,20 +62,24 @@ def plot_masked_segmap(s_img):
     pp.colorbar()
     f.axes[0].xaxis.set_visible(False); f.axes[0].yaxis.set_visible(False)
     return f
-
-# Find non-iterative labeling via topographical analysis of log(P)
 0/0
+# Find non-iterative labeling via topographical analysis of log(P)
 (labels,
  clusters,
  peaks,
- saddles) = cell_labels.assign_modes_by_density(np.log(p))
-cluster_cutoff = int(0.005 * clusters.size + 0.5)
-false_labels = modes.threshold_clusters(clusters, cluster_cutoff)
+ saddles) = cell_labels.assign_modes_by_density(np.log(p), zmask)
+## cluster_cutoff = int(0.005 * labels.size + 0.5)
+## falsely_labeled = modes.threshold_clusters(
+##     clusters, peaks, saddles, cluster_cutoff
+##     )
+## np.put(labels, falsely_labeled, -1)
+# also need to 
 
+## 0/0
 s_img0 = modes.segment_image_from_labeled_modes(
     img, labels, edges, spatial_features=spatial
     )
-print 'partial segmentation : %d / %d pixels labeled'%((s_img0>0).sum(),
+print 'partial segmentation : %d / %d pixels labeled'%((s_img0>=0).sum(),
                                                        s_img0.size)
 f = plot_masked_segmap(s_img0)
 f.savefig(iname+'_initial.pdf')
@@ -90,7 +97,7 @@ f.savefig(iname+'_pixel_resolved_from_initial.pdf')
  nclusters,
  npeak_by_mode,
  nsaddles) = modes.merge_persistent_modes(
-        labels, saddles, clusters, peaks, 0.05
+        labels, saddles, clusters, peaks, 1
      )
 clabels = ut.contiguous_labels(nlabels, nclusters)
  

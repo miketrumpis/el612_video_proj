@@ -19,3 +19,5 @@ cdef np.ndarray[idx_type, ndim=1] flatten_idc(
 cdef inline idx_type clamp(double n, idx_type mn, idx_type mx)
 
 cdef inline int oob(idx_type i, idx_type N)
+
+cdef inline int array_oob(idx_type *i, idx_type *N, int nd)

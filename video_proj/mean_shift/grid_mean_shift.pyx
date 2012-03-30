@@ -31,7 +31,7 @@ def multilinear_interpolation(np.ndarray[np.float64_t, ndim=1] p, grid):
     grid_range_d = 1 if grid.ndim == grid_domain_d else grid.shape[-1]
     cdef np.ndarray[np.float64_t, ndim=2] f_grid = \
         grid.reshape(-1, grid_range_d)
-    cdef np.ndarray[np.float64_t, ndim=1] r = np.empty((grid_range_d,), 'd')
+    cdef np.ndarray[np.float64_t, ndim=1] r = np.zeros((grid_range_d,), 'd')
 
     # these are the Nx2 interpolation nodes offsets
     cdef np.ndarray[idx_type, ndim=2] nodes = \
@@ -68,7 +68,6 @@ def multilinear_interpolation(np.ndarray[np.float64_t, ndim=1] p, grid):
 
         alpha = 1.0
         for d in range(grid_domain_d):
-            r[d] = 0
             # cube_corners[n,d] either 0 or 1
             corner[d] = nodes[d, cube_corners[n,d+col_off]]
             alpha *= interp_coefs[d, cube_corners[n,d+col_off]]

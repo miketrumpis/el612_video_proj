@@ -19,10 +19,18 @@ dirs = list(numpy_include_dirs) + ['video_proj']
 ## dirs.extend(Cython.__path__)
 ## dirs.append('.')
 
-cell_label = Extension(
-    'video_proj.mean_shift.cell_labels',
-    ['video_proj/mean_shift/cell_labels.pyx'], 
-    include_dirs = dirs, 
+## cell_label = Extension(
+##     'video_proj.mean_shift.cell_labels',
+##     ['video_proj/mean_shift/cell_labels.pyx'], 
+##     include_dirs = dirs,
+##     language='c++',
+##     extra_compile_args=['-O3']
+##     )
+topological = Extension(
+    'video_proj.mean_shift.topological',
+    ['video_proj/mean_shift/topological.pyx'], 
+    include_dirs = dirs,
+    language='c++',
     extra_compile_args=['-O3']
     )
 histogram = Extension(
@@ -49,6 +57,6 @@ if __name__=='__main__':
         name = 'video_proj',
         version = '1.0',
         packages = ['video_proj', 'video_proj.mean_shift'],
-        ext_modules = [ cell_label, histogram, indexing, gmshift],
+        ext_modules = [ topological, histogram, indexing, gmshift],
         cmdclass = {'build_ext': build_ext}
     )

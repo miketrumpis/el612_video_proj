@@ -1,3 +1,4 @@
+# cython: profile=True
 """ -*- python -*- file
 """
 from __future__ import division
@@ -82,6 +83,7 @@ def multi_idx_p(int flat_idx, tuple dims):
         )
     return idx
 
+@cython.boundscheck(False)
 cdef inline idx_type clamp(double n, idx_type mn, idx_type mx):
     cdef idx_type i = <idx_type> n
     if i < mn:
@@ -90,9 +92,19 @@ cdef inline idx_type clamp(double n, idx_type mn, idx_type mx):
         return mx
     return i
 
+@cython.boundscheck(False)
 cdef inline int oob(idx_type i, idx_type N):
     if (i<0) or (i>=N):
         return 1
     else:
         return 0
+
+# XXX: why is this way slower than nd times oob?
+@cython.boundscheck(False)
+cdef inline int array_oob(idx_type *i, idx_type *N, int nd):
+    cdef int k
+    for k in range(nd):
+        if oob(i[k], N[k]):
+            return 1
+    return 0
 

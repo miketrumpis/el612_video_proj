@@ -1,5 +1,5 @@
 import numpy as np
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib._cm import datad
 
 def npt_colormap(N, name='jet'):
@@ -52,3 +52,15 @@ def yuv2rgb(image):
     return rgb_image_bytes
     
     
+def quantize_from_centroid(image, seg_map):
+    label_set = np.unique(seg_map[seg_map>0])
+    n_colors = np.max(label_set) + 1
+    f_image = image.reshape(-1, 3)
+    f_smap = seg_map.ravel()
+    colors = np.zeros((n_colors, 3), 'd')
+    for n, ell in enumerate(label_set):
+        l_pix = np.where(f_smap==ell)[0]
+        colors[ell] = np.mean(f_image[l_pix], axis=0)
+    safe_seg_map = np.where(seg_map>=0, seg_map, 0)
+    return np.round(colors[safe_seg_map]).astype('B')
+
