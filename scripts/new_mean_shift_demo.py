@@ -25,21 +25,25 @@ def plot_masked_centroid_image(image, segmap):
     mask.shape = (-1, 3)
     mask[segmap.ravel() <= 0] = 0
     pp.imshow(np.ma.MaskedArray(c_image, mask=mask))
+    f.axes[0].xaxis.set_visible(False); f.axes[0].yaxis.set_visible(False)
     return f
 
 ## # swan
 ## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/test/8068.jpg')
 ## iname = 'swan'
+## c_sigma = 10; s_sigma = 30; p_thresh = 0.05
 ## # llama (HARD!)
 ## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/test/6046.jpg')
 ## iname = 'llama'
+## c_sigma = 5.0; s_sigma = 40.0; p_thresh = 0.3
 # starfish
 img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/12003.jpg')
 iname = 'starfish'
-## # monkey
+c_sigma = 10.0; s_sigma = 50.0; p_thresh = 0.0
+# monkey
 ## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/16052.jpg')
 ## iname = 'monkey'
-
+## c_sigma = 10.0; s_sigma = 5.0; p_thresh = 0.17
 
 rgb_img = np.array(img)
 f = pp.figure()
@@ -48,26 +52,29 @@ f.savefig(iname+'_raw.pdf')
 f.axes[0].xaxis.set_visible(False); f.axes[0].yaxis.set_visible(False)
 img = colors.rgb2lab(rgb_img)
 ## img = img[...,0].squeeze()
-c_sigma = 5
 spatial = True
-s_sigma = 20.0
 
 m_seek = topo.ModeSeeking(
     spatial_bw = s_sigma, color_bw = c_sigma
     )
-classifier = m_seek.train_on_image(img)
+classifier = m_seek.train_on_image(img, bin_sigma = 1.25)
 
-s_img0 = classifier.classify(img, refined=False)
+s_img0 = classifier.classify(img, refined=False, cluster_size_threshold=50)
 print 'partial segmentation : %d / %d pixels labeled'%((s_img0>=0).sum(),
                                                        s_img0.size)
 f = plot_masked_centroid_image(rgb_img, s_img0)
 f.savefig(iname+'_initial.pdf')
+f = plot_masked_segmap(s_img0)
+f.savefig(iname+'_initial_labels.pdf')
 pp.show()
 
-classifier = m_seek.persistence_merge(2)
-s_img1 = classifier.classify(img, refined=False)
+classifier = m_seek.persistence_merge(p_thresh)
+classifier.refine_labels()
+s_img1 = classifier.classify(img, refined=False, cluster_size_threshold=50)
 print 'partial segmentation : %d / %d pixels labeled'%((s_img1>=0).sum(),
                                                        s_img1.size)
 f = plot_masked_centroid_image(rgb_img, s_img1)
-f.savefig(iname+'_persistence_no_refine.pdf')
+f.savefig(iname+'_persistence_refined_model.pdf')
+f = plot_masked_segmap(s_img1)
+f.savefig(iname+'_persistence_refined_model_labels.pdf')
 pp.show()

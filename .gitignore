@@ -2,6 +2,7 @@
 *.html
 *.pyc
 *.c
+*.cpp
 *.so
 *.~
 build/

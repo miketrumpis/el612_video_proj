@@ -52,11 +52,18 @@ indexing = Extension(
     extra_compile_args=['-O3']
     )
 
+c_util = Extension(
+    'video_proj._c_util',
+    ['video_proj/_c_util.pyx'], 
+    include_dirs = dirs, 
+    extra_compile_args=['-O3']
+    )
+
 if __name__=='__main__':
     setup(
         name = 'video_proj',
         version = '1.0',
         packages = ['video_proj', 'video_proj.mean_shift'],
-        ext_modules = [ topological, histogram, indexing, gmshift],
+        ext_modules = [ topological, histogram, indexing, gmshift, c_util],
         cmdclass = {'build_ext': build_ext}
     )

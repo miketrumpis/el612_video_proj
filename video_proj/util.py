@@ -5,6 +5,8 @@ import matplotlib.animation as animation
 import colors
 from glob import glob
 
+from _c_util import *
+
 def image_to_features(image):
     """
     Convert image array into matrix of feature vectors, where each row
@@ -12,7 +14,7 @@ def image_to_features(image):
     """
     Ny, Nx = image.shape[:2]
     yy, xx = np.mgrid[0:Ny, 0:Nx]
-    n_color_dim = 1 if len(image.shape) < 3 else 3
+    n_color_dim = 1 if len(image.shape) < 3 else image.shape[2]
     features = np.c_[xx.ravel(), yy.ravel(), image.reshape(Ny*Nx, n_color_dim)]
     return features
 

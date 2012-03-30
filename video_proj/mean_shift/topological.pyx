@@ -67,21 +67,21 @@ cdef class Saddle:
     cdef public idx_type idx
     cdef public double elevation, persistence
     ## cdef public Mode sub, dom
-    cdef public int sub, dom
+    cdef public label_type sub, dom
 
     def __init__(self, idx, elevation, m1, m2):
         if m1 < m2:
             self.sub = m1.label
             self.dom = m2.label
             self.persistence = m1.elevation - elevation
-        elif m2 < m1:
-            self.sub = m2.label
-            self.dom = m1.label
-            self.persistence = m2.elevation - elevation
+        ## elif m2 < m1:
+        ##     self.sub = m2.label
+        ##     self.dom = m1.label
+        ##     self.persistence = m2.elevation - elevation
         else:
             self.sub = m2.label
             self.dom = m1.label
-            self.persistence = huge
+            self.persistence = m2.elevation - elevation
         self.elevation = elevation
         self.idx = idx
 
@@ -94,8 +94,19 @@ cdef class Saddle:
         return s
 
     def __richcmp__(self, s2, int op):
+        v1, v2 = self.persistence, s2.persistence
         if op == 0:
-            return self.persistence < s2.persistence
+            return v1 < v2
+        elif op == 1:
+            return v1 <= v2
+        elif op == 2:
+            return v1 == v2
+        elif op == 3:
+            return v1 != v2
+        elif op == 4:
+            return v1 > v2
+        elif op == 5:
+            return v1 >= v2
         return False
 
 # This should be out of date
@@ -216,8 +227,14 @@ cdef class ModeSeeking:
                 self.clusters[dom], self.clusters[sub]
                 )
         if self.clusters[dom] < self.clusters[sub]:
+            ## t = saddle.sub
+            ## saddle.sub = saddle.dom
+            ## saddle.dom = t
             saddle.sub = dom
             saddle.dom = sub
+        else:
+            saddle.dom = dom
+            saddle.sub = sub
         if dom == sub:
             saddle.persistence = huge
         else:
@@ -228,6 +245,7 @@ cdef class ModeSeeking:
     def update_all_saddles(self, copy=False):
         if not self._trained:
             raise RuntimeError('This model is not yet trained')
+        ## cdef Saddle s
         if copy:
             return [self._update_saddle(s, True) for s in self.saddles]
         # otherwise make saddles current with the state of true_labels
@@ -242,20 +260,20 @@ cdef class ModeSeeking:
         saddles = self.update_all_saddles(copy=True)
         cdef Saddle min_saddle
         merged = False
+        # The number of iterations here should really be upper bounded
+        # by the number of saddles, yes???
+        n_iter = 0
         while not merged:
             merged = True
             self.update_all_saddles()
             min_saddle = min(self.saddles)
-            ## for min_saddle in saddles:
-            ##     self._update_saddle(min_saddle)
-            ## min_saddle = min(saddles)
-            ## print min_saddle.persistence
             if min_saddle.persistence < thresh:
                 self._true_labels[0][min_saddle.sub] = min_saddle.dom
                 merged = False
+            n_iter += 1
         cls = self.classifier_from_state()
-        ## self.reset_labels()
-        ## self.saddles = saddles
+        self.reset_labels()
+        self.saddles = saddles
         return cls
 
     cdef _merged_boundaries(self):
@@ -299,7 +317,7 @@ cdef class ModeSeeking:
             self.grid, self.cell_edges, spatial=self._spatial
             )
 
-    def train_on_image(self, image, density_xform=np.log):
+    def train_on_image(self, image, bin_sigma=1.0, density_xform=np.log):
         # This should return something like a PixelClassifier
         b, accum, edges = histogram(
             image, self.spatial_bw,
@@ -308,7 +326,7 @@ cdef class ModeSeeking:
             )
 
         zmask = (b>0)
-        p, mu = smooth_density(b, 1, accum=accum, mode='constant')
+        p, mu = smooth_density(b, bin_sigma, accum=accum, mode='constant')
         del b
         del accum
         self.grid = np.concatenate( (mu, p[...,None]), axis=-1).copy()
@@ -319,7 +337,8 @@ cdef class ModeSeeking:
         self.labels = self.assign_modes(density_xform(p), zmask.astype('B'))
         self._trained = 1
         return PixelModeClassifier(
-            self.labels, self.grid, self.cell_edges, spatial=self._spatial
+            self.labels.copy(), self.grid, self.cell_edges,
+            spatial=self._spatial
             )
 
     @cython.boundscheck(False)
@@ -450,33 +469,37 @@ cdef int cell_neighbors_brute(
     for a0 in range(-1,2):
         if oob(idx[0]+a0, dims[0]):
             continue
-        for a1 in range(-1,2):
-            if oob(idx[1]+a1, dims[1]):
-                continue
-            if nd == 2:
-                nb_idx[0,k] = idx[0]+a0
-                nb_idx[1,k] = idx[1]+a1
-                k += 1
-            else:
-                for a2 in range(-1,2):
-                    if oob(idx[2]+a2, dims[2]):
-                        continue
-                    if nd == 3:
-                        nb_idx[0,k] = idx[0]+a0
-                        nb_idx[1,k] = idx[1]+a1
-                        nb_idx[2,k] = idx[2]+a2
-                        k += 1
-                    else:
-                        for a3 in range(-1,2):
-                            if oob(idx[3]+a3, dims[3]):
-                                continue
-                            for a4 in range(-1,2):
-                                if oob(idx[4]+a4, dims[4]):
+        if nd == 1:
+            nb_idx[0,k] = idx[0]+a0
+            k += 1
+        else:
+            for a1 in range(-1,2):
+                if oob(idx[1]+a1, dims[1]):
+                    continue
+                if nd == 2:
+                    nb_idx[0,k] = idx[0]+a0
+                    nb_idx[1,k] = idx[1]+a1
+                    k += 1
+                else:
+                    for a2 in range(-1,2):
+                        if oob(idx[2]+a2, dims[2]):
+                            continue
+                        if nd == 3:
+                            nb_idx[0,k] = idx[0]+a0
+                            nb_idx[1,k] = idx[1]+a1
+                            nb_idx[2,k] = idx[2]+a2
+                            k += 1
+                        else:
+                            for a3 in range(-1,2):
+                                if oob(idx[3]+a3, dims[3]):
                                     continue
-                                nb_idx[0,k] = idx[0]+a0
-                                nb_idx[1,k] = idx[1]+a1
-                                nb_idx[2,k] = idx[2]+a2
-                                nb_idx[3,k] = idx[3]+a3
-                                nb_idx[4,k] = idx[4]+a4
-                                k += 1
+                                for a4 in range(-1,2):
+                                    if oob(idx[4]+a4, dims[4]):
+                                        continue
+                                    nb_idx[0,k] = idx[0]+a0
+                                    nb_idx[1,k] = idx[1]+a1
+                                    nb_idx[2,k] = idx[2]+a2
+                                    nb_idx[3,k] = idx[3]+a3
+                                    nb_idx[4,k] = idx[4]+a4
+                                    k += 1
     return k

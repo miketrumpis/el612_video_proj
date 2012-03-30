@@ -29,6 +29,9 @@ cdef inline idx_type flat_idx(idx_type *multi_idx, int nd, idx_type *dims):
         stride *= dims[k]
     return f_idx
 
+# XXX: this seems to have about a 2:1 overhead, eg
+# for ~51K calls, 3.2 seconds are spend on this routine,
+# with only 0.9 seconds spend in flat_idx()
 @cython.boundscheck(False)
 cdef np.ndarray[idx_type, ndim=1] flatten_idc(
     np.ndarray[idx_type, ndim=2] idc, 

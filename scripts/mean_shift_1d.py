@@ -3,39 +3,32 @@ import matplotlib.pyplot as pp
 import PIL.Image as PImage
 
 import video_proj.colors as colors
-import video_proj.mean_shift.modes as modes
-import video_proj.mean_shift.cell_labels as cell_labels
+from video_proj.mean_shift.topological import ModeSeeking
 
 # swan
 img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/test/8068.jpg')
 iname = 'swan'
 
-img = colors.rgb2lab(np.array(img))
+image = colors.rgb2lab(np.array(img))
+gray_image = image[...,0]
 
-# lightness features, in [0,100)
-l_features = img[...,0].ravel()
 sigma = 4.0
 
-b, x = np.histogram(l_features, bins=np.ceil(100/sigma))
-p = modes.smooth_density(b.astype('d'), .25, mode='constant')
+ms = ModeSeeking(color_bw=sigma)
+c = ms.train_on_image(gray_image, density_xform=None)
+x = c.cell_edges[0]
 xc = (x[:-1] + x[1:])/2.0
+p = c.mud_grid[...,-1]
 
-(labels,
- clusters,
- peaks,
- saddles) = cell_labels.assign_modes_by_density(p)
-
-peak_pts = dict()
-for label in clusters:
-    argmx = np.argmax(np.where(labels==label, p, 0))
-    peak_pts[label] = argmx
+peak_pts = [m.idx for (_, m) in ms.clusters.items()]
+peak_hts = [m.elevation for (_, m) in ms.clusters.items()]
+saddle_pts = [s.idx for s in ms.saddles]
+saddle_hts = [s.elevation for s in ms.saddles]
 
 f = pp.figure()
 pp.plot(xc, p)
-pp.plot([xc[peak_pts[c]] for c in clusters.keys()],
-        [peaks[c] for c in clusters.keys()], 'go', label='Modes')
-pp.plot([xc[s.idx] for s in saddles],
-        [s.elevation for s in saddles], 'ro', label='Saddles')
+pp.plot(xc[peak_pts], peak_hts, 'go', label='Modes')
+pp.plot(xc[saddle_pts], saddle_hts, 'ro', label='Saddles')
 pp.title('Estimated Density of Image Lightness')
 pp.legend()
 f.savefig('1D_modes.pdf')

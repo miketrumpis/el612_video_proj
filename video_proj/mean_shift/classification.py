@@ -3,7 +3,7 @@ import itertools
 
 from histogram import nearest_cell_idx, normalized_feature
 from grid_mean_shift import multilinear_interpolation
-from ..util import image_to_features
+from ..util import image_to_features, cluster_size_filter
 
 class PixelModeClassifier(object):
     """
@@ -27,15 +27,18 @@ class PixelModeClassifier(object):
         self.spatial = spatial
 
     def refine_labels(self):
-        # this would refine the labeling array
-        pass
+        resolve_label_boundaries(
+            self.labels, self.mud_grid, self.cell_edges, max_iter = 20
+            )
 
-    def classify(self, image, refined=True):
+    def classify(self, image, refined=True, cluster_size_threshold=0):
         initial = segment_image_from_labeled_modes(
             image, self.labels, self.cell_edges,
             spatial_features = self.spatial
             )
         if not refined:
+            if cluster_size_threshold:
+                cluster_size_filter(initial, cluster_size_threshold)
             return initial
         features = image_to_features(image)
         if not self.spatial:
@@ -44,6 +47,8 @@ class PixelModeClassifier(object):
             initial, features, self.mud_grid, self.labels,
             self.cell_edges, max_iter = 10
             )
+        if cluster_size_threshold:
+            cluster_size_filter(initial, cluster_size_threshold)
         return initial
 
 def cell_neighbors(c_idx, dims):
@@ -163,8 +168,7 @@ def resolve_segmentation_boundaries(
     return
 
 def resolve_label_boundaries(
-        labels, p, mu, cell_edges,
-        boundary = -1, max_iter = 20
+        labels, grid, cell_edges, max_iter = 20
         ):
     """
     For each boundary point in labels, perform a gradient ascent using
@@ -189,53 +193,45 @@ def resolve_label_boundaries(
     # the boundary points should be ordered by decreasing density
     ## boundary_pts = np.where(labels.ravel()==boundary)[0]
     boundary_pts = np.where(labels.ravel()<0)[0]
+    p = grid[...,-1]
     order = np.argsort(p.flat[boundary_pts])[::-1]
+    ## order = np.argsort(p.flat[boundary_pts])[::-1]
     boundary_pts = np.unravel_index(boundary_pts[order], labels.shape)
-    grid = np.concatenate( (mu, p[...,None]), axis=-1).copy()
+    ## grid = np.concatenate( (mu, p[...,None]), axis=-1).copy()
+    ## boundary_pts = np.unravel_index(boundary_pts, labels.shape)
     gdims = grid.shape[:-1]
     prev_ms = np.zeros((len(gdims),), 'd')
     unit_edges = [np.arange(d+1, dtype='d') for d in gdims]
     for x in itertools.izip(*boundary_pts):
-        walking = True
+        assigned = False
         fvec = np.array(x, 'd') + 0.5
         n_iter = 0
-        # -- replace following with classifier built on
-        #    multi-linear interpolation over the index grid
-        #    and density manifold --
-        while walking and n_iter < max_iter:
-            ## if use_ellipse:
-            ##     ball = quasi_elliptical_ball(btree, fvec, sigma, c_sigma)
-            ## else:
-            ##     sigma_ball_idc = btree.query_radius(fvec, sigma)[0]
-            ##     ball = features[sigma_ball_idc]
-            ## ## fvec = gaussian_mean_shift_update(fvec, sigma_ball, sigma)
-            ## if not len(ball):
-            ##     labels[x] = boundary
-            ##     walking = False
-            ##     continue
-            ## fvec = np.mean(ball, axis=0)
-
+        prev_ms[:] = 0
+        while not assigned and n_iter < max_iter:
             mean = multilinear_interpolation(fvec, grid)
             density = mean[-1]
             mean = mean[:-1]
-            if density > 1e-8:
+            if density > 1e-4:
                 mean /= density
+            else:
+                assigned = True
             ms = mean - fvec
             cs = np.dot(ms, prev_ms)
             if cs < 0:
                 ms -= prev_ms * cs
             norm_sq = np.dot(ms, ms)
-            if norm_sq < (0.2**2):
-                ms *= 0.2/np.sqrt(norm_sq)
-            fvec += ms
-            prev_ms = ms/np.sqrt(norm_sq)
-
+            if norm_sq > 1e-8:
+                if norm_sq < (0.2**2):
+                    ms *= 0.2/np.sqrt(norm_sq)
+                fvec += ms
+                prev_ms = ms/np.sqrt(norm_sq)
+            else:
+                assigned = True
             
-            cx = nearest_cell_idx(fvec[None,:], unit_edges)[0]
-            cx_label = labels[tuple(cx)]
-            ## if cx_label != boundary:
-            if cx_label > 0:
-                labels[x] = cx_label
-                walking = False
+            idx = nearest_cell_idx(fvec[None,:], unit_edges)[0]
+            label = labels[tuple(idx)]
+            if label > 0:
+                labels[x] = label
+                assigned = True
             n_iter += 1
-        ## print 'label', cx_label, 'after', n_iter, 'iters'
+        ## print 'label', label, 'after', n_iter, 'iters'
