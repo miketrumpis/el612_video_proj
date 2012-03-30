@@ -20,6 +20,7 @@ html:  ${PKGDIR}/mean_shift/cell_labels.html ${PKGDIR}/mean_shift/histogram.html
 clean:
 	- find ${PKGDIR} -name "*.so" -print0 | xargs -0 rm
 	- find ${PKGDIR} -name "*.c" -print0 | xargs -0 rm
+	- find ${PKGDIR} -name "*.cpp" -print0 | xargs -0 rm
 	- find ${PKGDIR} -name "*.html" -print0 | xargs -0 rm
 	- find . -name "*.pyc" -print0 | xargs -0 rm
 	rm -rf build
