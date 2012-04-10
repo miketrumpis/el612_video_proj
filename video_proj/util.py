@@ -2,9 +2,6 @@ import numpy as np
 import matplotlib.pyplot as pp
 import matplotlib.animation as animation
 
-import colors
-from glob import glob
-
 from _c_util import *
 
 def image_to_features(image):
@@ -28,43 +25,6 @@ def contiguous_labels(labels, clusters):
         old_cluster = clusters[ok]
         np.put(relabel, old_cluster, nk)
     return relabel
-
-def yuv_image(b_arr, Nx, Ny, yuv_mode='420'):
-    """
-    Convert an array of bytes containing YUV information into an
-    RGB frame with dimensions in shape.
-    """
-    if isinstance(b_arr, str):
-        b_arr = open(b_arr, 'rb')
-    if isinstance(b_arr, file):
-        b_arr = np.fromfile(b_arr, dtype=np.uint8)
-    if yuv_mode == '444':
-        c_sub = 1
-        raise NotImplementedError
-    if yuv_mode in ('420', '422'):
-        c_sub = 2
-    else:
-        raise NotImplementedError
-    cbytes = Nx*Ny/c_sub**2
-    y = b_arr[:Nx*Ny]
-    u = b_arr[Nx*Ny:Nx*Ny+cbytes]
-    v = b_arr[Nx*Ny+cbytes:]
-    y.shape = (Ny, Nx); u.shape = (Ny/2, Nx/2); v.shape = (Ny/2, Nx/2)
-    if c_sub > 1:
-        u = np.repeat(u, c_sub, axis=0); u = np.repeat(u, c_sub, axis=1)
-        v = np.repeat(v, c_sub, axis=0); v = np.repeat(v, c_sub, axis=1)
-    image = np.c_[y.ravel(), u.ravel(), v.ravel()]
-    rgb_image = colors.yuv2rgb(image).reshape(Ny,Nx,3)
-    return rgb_image
-    
-def yuv_sequence(b_root, Nx, Ny, yuv_mode='420', t_range=()):
-    b_files = glob(b_root)
-    if t_range:
-        b_files = b_files[t_range[0]:t_range[1]]
-    vid = np.empty((len(b_files), Ny, Nx, 3), np.uint8)
-    for t,f in enumerate(b_files):
-        vid[t] = yuv_image(f, Nx, Ny)
-    return vid
 
 def animate_frames(frames, movie_name='', image_fov=None, fps=5):
     fig = pp.figure()
@@ -130,3 +90,18 @@ def cartesian(arrays, out=None):
         for j in xrange(1, arrays[0].size):
             out[j*m:(j+1)*m,1:] = out[0:m,1:]
     return out
+
+class Bucket(object):
+    """
+    Ye Olde Bucket class
+    """
+
+    def __init__(self, *args, **kwargs):
+        object.__init__(self)
+        self.__dict__.update(kwargs)
+        # in case this is instantiated by the call Bucket(somedict)
+        # instead of Bucket(**somedict)
+        if len(args)==1 and isinstance(args[0], dict):
+            self.__dict__.update(args[0])
+
+    
