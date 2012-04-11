@@ -26,15 +26,13 @@ def contiguous_labels(labels, clusters):
         np.put(relabel, old_cluster, nk)
     return relabel
 
-def animate_frames(frames, movie_name='', image_fov=None, fps=5):
+def animate_frames(frames, movie_name='', fps=5, **imshow_kw):
     fig = pp.figure()
     ims = []
     for n, f in enumerate(frames):
-        i = pp.imshow(f, extent=image_fov)
+        i = pp.imshow(f, **imshow_kw)
         x,_ = i.axes.get_xlim()
         y,_ = i.axes.get_ylim()
-##         i.axes.text(x+1,y+1,'Frame %d'%(n+1,))
-##         i.axes.set_title('Frame %d'%(n+1,))
         ims.append([i])
     ani = animation.ArtistAnimation(fig, ims)
     if movie_name:

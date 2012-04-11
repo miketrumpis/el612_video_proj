@@ -5,6 +5,14 @@ from histogram import nearest_cell_idx, normalized_feature
 from grid_mean_shift import multilinear_interpolation
 from ..util import image_to_features, cluster_size_filter
 
+def classify_sequence(classifier, vid):
+    seg_vid = np.zeros(vid.shape[:3], 'i')
+    for n in xrange(len(vid)):
+        seg_vid[n] = classifier.classify(
+            vid[n], refined=True, cluster_size_threshold=50
+            )
+    return seg_vid
+
 class PixelModeClassifier(object):
     """
     Classifies an image based on a labeling manifold calculated
