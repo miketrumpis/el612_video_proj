@@ -9,8 +9,6 @@ from video_proj.indexing cimport idx_type
 from ..util import image_to_features
 from ..indexing import py_idx_type as pidx_t
 
-# XXX: This needs to be vectorized! calling it for Ny*Nx features
-# swamps histogram -- in this sense, should just roll it into nearest_cell_idx
 def normalized_feature(f, list cell_edges):
     if len(f.shape) < 2:
         return nearest_cell_idx(f[None,:], cell_edges, real_idx=True)[0]
