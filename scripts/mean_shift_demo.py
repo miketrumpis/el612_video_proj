@@ -40,6 +40,16 @@ video = False
 ## iname = 'llama'
 ## c_sigma = 5.0; s_sigma = 40.0; p_thresh = 0.3; n_parts = 4
 
+# dharma
+## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/56028.jpg')
+## iname = 'dharma'
+## c_sigma = 3.0; s_sigma = 0; p_thresh = 0; n_parts = 10
+
+# bear
+img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/100080.jpg')
+iname = 'bear'
+c_sigma = 5.0; s_sigma = 70; p_thresh = 0.01; n_parts = 5
+
 # starfish
 ## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/12003.jpg')
 ## iname = 'starfish'
@@ -67,13 +77,13 @@ video = False
 ## iname = 'football'
 ## c_sigma = 3; s_sigma = None; p_thresh = 0.03; n_parts = 14; video = True
 
-vid, _ = importing.y4m_sequence(
-    '/Users/mike/docs/classes/el612/vids/stefan_sif.y4m',
-    t_range=()
-    )
-img = vid[0]
-iname = 'stefan'
-c_sigma = 5; s_sigma = None; p_thresh = 0; n_parts = 20; video = True
+## vid, _ = importing.y4m_sequence(
+##     '/Users/mike/docs/classes/el612/vids/stefan_sif.y4m',
+##     t_range=()
+##     )
+## img = vid[0]
+## iname = 'stefan'
+## c_sigma = 5; s_sigma = None; p_thresh = 0; n_parts = 20; #video = True
 
 
 rgb_img = np.array(img)
@@ -117,6 +127,10 @@ f.savefig(iname+'_persistence_%d_parts_model.pdf'%n_parts)
 f = plot_masked_segmap(s_img1)
 f.savefig(iname+'_persistence_%d_parts_model_labels.pdf'%n_parts)
 
+bmap = ut.draw_boundaries(s_img1, m_seek.saddles)
+f = pp.figure()
+pp.imshow(bmap, cmap=pp.cm.gray)
+f.savefig(iname+'_boundaries.pdf')
 
 if video:
     lab_vid = np.array(
