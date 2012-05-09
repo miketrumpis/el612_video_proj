@@ -90,7 +90,7 @@ cdef class Saddle:
             self.idx, self.elevation, self.persistence
             )
         ## s = s+'Sub Mode: %s\nDom Mode: %s'%(self.sub, self.dom)
-        s = s+'Sub Mode: %d\nDom Mode: %d'%(self.sub, self.dom)
+        s = s+'Sub Mode: %d, Dom Mode: %d\n'%(self.sub, self.dom)
         return s
 
     def __richcmp__(self, s2, int op):
@@ -275,6 +275,40 @@ cdef class ModeSeeking:
         self.reset_labels()
         self.saddles = saddles
         return cls
+
+    def merge_until_n(self, n):
+        # XXX: actually merges until there are up to n clusters,
+        # since merging on n+p clusters may result in the true
+        # merging of > p clusters
+        if not self._trained:
+            raise RuntimeError('This model is not yet trained')
+        # this should do merging of persistent modes, and then
+        # return a new PixelClassifier
+        saddles = self.update_all_saddles(copy=True)
+        cdef Saddle min_saddle
+        merged = False
+        # The number of iterations here should really be upper bounded
+        # by the number of saddles, yes???
+        n_iter = 0
+        while not merged:
+            merged = True
+            self.update_all_saddles()
+            sub_saddles = filter(
+                lambda s: s.persistence < huge, self.saddles
+                )
+            sub_modes = [s.sub for s in sub_saddles]
+            dom_modes = [s.dom for s in sub_saddles]
+            modes = set( sub_modes + dom_modes )
+            if len(modes) > n:
+                min_saddle = min(sub_saddles)
+                self._true_labels[0][min_saddle.sub] = min_saddle.dom
+                merged = False
+            n_iter += 1
+        cls = self.classifier_from_state()
+        self.reset_labels()
+        self.saddles = saddles
+        return cls
+        
 
     cdef _merged_boundaries(self):
         cdef set nb_set

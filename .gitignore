@@ -1,4 +1,6 @@
+*.DS_Store
 *.pdf
+*.mp4
 *.html
 *.pyc
 *.c

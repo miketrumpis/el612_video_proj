@@ -29,45 +29,58 @@ def plot_masked_centroid_image(image, segmap):
     f.axes[0].xaxis.set_visible(False); f.axes[0].yaxis.set_visible(False)
     return f
 
-## # swan
+video = False
+# swan
 ## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/test/8068.jpg')
 ## iname = 'swan'
-## c_sigma = 10; s_sigma = 30; p_thresh = 0.05
-## # llama (HARD!)
+## c_sigma = 10; s_sigma = 40; p_thresh = 0.05; n_parts = 3
+
+# llama (HARD!)
 ## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/test/6046.jpg')
 ## iname = 'llama'
-## c_sigma = 5.0; s_sigma = 40.0; p_thresh = 0.3
-## # starfish
+## c_sigma = 5.0; s_sigma = 40.0; p_thresh = 0.3; n_parts = 4
+
+# starfish
 ## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/12003.jpg')
 ## iname = 'starfish'
-## c_sigma = 10.0; s_sigma = 50.0; p_thresh = 0.0
+## c_sigma = 10.0; s_sigma = 50.0; p_thresh = 0; n_parts = 2
+
 # monkey
 ## img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/train/16052.jpg')
 ## iname = 'monkey'
-## c_sigma = 10.0; s_sigma = 5.0; p_thresh = 0.17
+## c_sigma = 10.0; s_sigma = 5.0; p_thresh = 0.17; 
 
 ## # Crew sequence
 ## vid, _ = importing.y4m_sequence(
-##     '/Users/mike/docs/classes/el612/vids/crew_cif.y4m', t_range=(40,100)
+##     '/Users/mike/docs/classes/el612/vids/crew_cif.y4m', t_range=(40,140)
 ##     )
 ## img = vid[0]
 ## iname = 'crew'
-## c_sigma = 10; s_sigma = None; p_thresh = 0
+## c_sigma = 10; s_sigma = None; p_thresh = 0; n_parts = 2; video = True
 
 # Football sequence
+## vid, _ = importing.y4m_sequence(
+##     '/Users/mike/docs/classes/el612/vids/football_422_cif.y4m',
+##     t_range=(1,100)
+##     )
+## img = vid[0]
+## iname = 'football'
+## c_sigma = 3; s_sigma = None; p_thresh = 0.03; n_parts = 14; video = True
+
 vid, _ = importing.y4m_sequence(
-    '/Users/mike/docs/classes/el612/vids/football_422_cif.y4m',
-    t_range=(40,100)
+    '/Users/mike/docs/classes/el612/vids/stefan_sif.y4m',
+    t_range=()
     )
 img = vid[0]
-iname = 'football'
-c_sigma = 4; s_sigma = None; p_thresh = 0.03
+iname = 'stefan'
+c_sigma = 5; s_sigma = None; p_thresh = 0; n_parts = 20; video = True
+
 
 rgb_img = np.array(img)
 f = pp.figure()
 pp.imshow(rgb_img)
-f.savefig(iname+'_raw.pdf')
 f.axes[0].xaxis.set_visible(False); f.axes[0].yaxis.set_visible(False)
+f.savefig(iname+'_raw.pdf')
 img = colors.rgb2lab(rgb_img)
 ## img = img[...,0].squeeze()
 
@@ -75,7 +88,6 @@ m_seek = topo.ModeSeeking(
     spatial_bw = s_sigma, color_bw = c_sigma
     )
 classifier = m_seek.train_on_image(img, bin_sigma = 1.25)
-
 s_img0 = classifier.classify(img, refined=False, cluster_size_threshold=50)
 print 'partial segmentation : %d / %d pixels labeled'%((s_img0>=0).sum(),
                                                        s_img0.size)
@@ -95,24 +107,59 @@ f.savefig(iname+'_persistence_refined_model.pdf')
 f = plot_masked_segmap(s_img1)
 f.savefig(iname+'_persistence_refined_model_labels.pdf')
 
+classifier = m_seek.merge_until_n(n_parts)
+classifier.refine_labels()
+s_img1 = classifier.classify(img, refined=False, cluster_size_threshold=50)
+print 'partial segmentation : %d / %d pixels labeled'%((s_img1>=0).sum(),
+                                                       s_img1.size)
+f = plot_masked_centroid_image(rgb_img, s_img1)
+f.savefig(iname+'_persistence_%d_parts_model.pdf'%n_parts)
+f = plot_masked_segmap(s_img1)
+f.savefig(iname+'_persistence_%d_parts_model_labels.pdf'%n_parts)
 
-lab_vid = np.array(
-    [colors.rgb2lab(vf) for vf in vid]
-    )
-svid = cls.classify_sequence(classifier, lab_vid)
-anim = ut.animate_frames(
-    np.ma.masked_where(svid < 0, svid),
-    movie_name=iname+'_naive_classifier',
-    fps=10,
-    cmap=colors.npt_colormap(svid.max())
-    )
-anim.repeat = False
-anim = ut.animate_frames(
-    vid,
-    movie_name=iname,
-    fps=10,
-    )
-anim.repeat = False
+
+if video:
+    lab_vid = np.array(
+        [colors.rgb2lab(vf) for vf in vid]
+        )
+    svid = cls.classify_sequence(classifier, lab_vid)
+    segcmap = colors.npt_colormap(svid.max())
+    n = pp.normalize()
+    svid_masked = np.where(svid < 0, 0, svid)
+    svid_mapped = segcmap(n(svid_masked).ravel()).reshape(svid.shape+(4,))
+    svid_mapped = (svid_mapped[...,:3]*255).astype('B')
+    both_vids = np.concatenate((vid, svid_mapped), axis=2)
+
+    anim = ut.animate_frames(
+        both_vids,
+        movie_name=iname+'_joint',
+        fps=25,
+        )
+    anim.repeat = False
+
+    ## anim = ut.animate_frames(
+    ##     np.ma.masked_where(svid < 0, svid),
+    ##     movie_name=iname+'_naive_classifier',
+    ##     fps=25,
+    ##     cmap=colors.npt_colormap(svid.max())
+    ##     )
+    ## anim.repeat = False
+    ## anim = ut.animate_frames(
+    ##     vid,
+    ##     movie_name=iname,
+    ##     fps=25,
+    ##     )
+    ## anim.repeat = False
+
+    ## x_mn, x_mx = (240, 320)
+    ## y_mn, y_mx = (46, 100)
+    ## hx = int(x_mx - x_mn)
+    ## hy = int(y_mx - y_mn)
+    ## x0 = (x_mx + x_mn)//2
+    ## y0 = (y_mx + y_mn)//2
+    ## x = np.array([x0, y0], 'i')
+    ## import video_proj.tracking.object_model as om
+    ## seed = om.RectangleTrackingObject(x, hx, hy)
 
 pp.show()
 

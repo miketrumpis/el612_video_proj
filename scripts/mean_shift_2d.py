@@ -30,7 +30,7 @@ p[zmask] = 0.9*min_p
 np.log(p, out=p)
 
 f = pp.figure()
-pp.imshow(p, origin='lower', interpolation='nearest')
+pp.imshow(p, origin='lower', interpolation='nearest', cmap=pp.cm.hot)
 pp.xlabel('blue'); pp.ylabel('green')
 pp.colorbar()
 pp.contour(p, levels=np.linspace(-10, p.max(), 15), origin='lower')

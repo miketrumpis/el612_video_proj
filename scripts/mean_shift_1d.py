@@ -31,5 +31,17 @@ pp.plot(xc[peak_pts], peak_hts, 'go', label='Modes')
 pp.plot(xc[saddle_pts], saddle_hts, 'ro', label='Saddles')
 pp.title('Estimated Density of Image Lightness')
 pp.legend()
+pp.gca().yaxis.set_visible(0)
 f.savefig('1D_modes.pdf')
+lim = pp.xlim(); df = lim[1] - lim[0]
+pp.axhline(
+    y=min(peak_hts), xmin=xc[0]/df, xmax=xc[-1]/df,
+    linestyle='--', color='g'
+    )
+pp.axhline(
+    y=max(saddle_hts), xmin=xc[0]/df, xmax=xc[-1]/df,
+    linestyle='--', color='r'
+    )
+f.savefig('1D_modes_persistence.pdf')
+
 pp.show()

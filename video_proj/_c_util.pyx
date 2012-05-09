@@ -23,10 +23,10 @@ def cluster_size_filter(np.ndarray[label_type, ndim=2] seg_map, int rho):
     cdef np.ndarray[label_type, ndim=1] flat_map = seg_map.ravel()
     cdef int k, m, n = seg_map.size
     cdef label_type ell
-    cdef label_type init = 0
+    cdef label_type init = -1
     # find first label of sufficient mass
     m = 0
-    while not init:
+    while init < 0 and m < n:
         ell = flat_map[m]
         if c_sizes[ell] < rho:
             m += 1
