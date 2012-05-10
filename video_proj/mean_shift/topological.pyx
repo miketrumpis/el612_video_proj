@@ -1,5 +1,13 @@
 # cython: profile=True
 """ -*- python -*- file
+
+This module implements 'topological' mean shift, as described in
+Paris and Durand, 2007. Some of the terminology and implementation
+details are based upon code under MIT and BSD licenses and the following
+copyright:
+
+Copyright (c) 2007, Sylvain Paris and Frédo Durand
+
 """
 import numpy as np
 import scipy.ndimage as ndimage

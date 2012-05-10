@@ -7,3 +7,18 @@ Redistribution and use in source and binary forms, with or without modification,
     Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Some terminology and implementation details of the "mean_shift" 
+package are motivated from C++ code by Sylvain Paris and Frédo Durand 
+under MIT and BSD licenses, and with the following copyright:
+
+Copyright (c) 2007, Sylvain Paris and Frédo Durand
+
+The algorithm is described in
+
+A Topological Approach to Hierarchical Segmentation using Mean Shift
+Sylvain Paris and Frédo Durand
+Proceedings of the IEEE conference on Computer Vision and Pattern Recognition
+2007
+http://people.csail.mit.edu/sparis/#cvpr07
+

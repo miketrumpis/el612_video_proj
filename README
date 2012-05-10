@@ -1,1 +1,33 @@
-Experimental code for EL6123 video project. See LICENSE
+===========================================
+Experimental code for EL6123 video project.
+===========================================
+
+This package is a skeleton of a framework for computing image
+segmentation and object tracking tasks.
+
+Segmentation
+------------
+
+The mean_shift package implements mean shift segmentation, using the
+algorithm described in    
+
+A Topological Approach to Hierarchical Segmentation using Mean Shift
+Sylvain Paris and Frédo Durand
+Proceedings of the IEEE conference on Computer Vision and Pattern Recognition
+2007
+http://people.csail.mit.edu/sparis/#cvpr07
+
+Tracking
+--------
+
+non existant
+
+Detection
+---------
+
+non existant
+
+License Info
+------------
+
+See LICENSE file
