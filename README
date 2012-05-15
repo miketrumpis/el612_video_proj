@@ -3,7 +3,8 @@ Experimental code for EL6123 video project.
 ===========================================
 
 This package is a skeleton of a framework for computing image
-segmentation and object tracking tasks.
+segmentation and object tracking tasks. See PDF regarding theoretical
+details.
 
 Segmentation
 ------------

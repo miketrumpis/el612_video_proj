@@ -1,5 +1,5 @@
 *.DS_Store
-*.pdf
+scripts/*.pdf
 *.mp4
 *.html
 *.pyc
