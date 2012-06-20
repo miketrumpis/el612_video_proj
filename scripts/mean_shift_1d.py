@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as pp
 import PIL.Image as PImage
 
-import video_proj.colors as colors
-from video_proj.mean_shift.topological import ModeSeeking
+import mstools.colors as colors
+from mstools.mean_shift.topological import ModeSeeking
 
 # swan
 img = PImage.open('/Users/mike/docs/classes/el612/proj/berk_data/BSR/BSDS500/data/images/test/8068.jpg')

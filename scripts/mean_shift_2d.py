@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as pp
-import video_proj.colors as colors
-import video_proj.util as ut
-from video_proj.mean_shift.topological import ModeSeeking
+import mstools.colors as colors
+import mstools.util as ut
+from mstools.mean_shift.topological import ModeSeeking
 
 import PIL.Image as PImage
 ## ## # swan

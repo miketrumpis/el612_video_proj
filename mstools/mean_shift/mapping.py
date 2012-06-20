@@ -4,10 +4,10 @@ This module implements various mappings from the pixel domain
 
 import numpy as np
 
-import video_proj.colors as colors
-import video_proj.util as util
+import mstools.colors as colors
+import mstools.util as util
 
-from video_proj.fn import Function
+from mstools.fn import Function
 
 def mean_color_image(image, segmap):
     c_image = colors.quantize_from_centroid(image, segmap)

@@ -4,7 +4,7 @@
 import numpy as np
 cimport numpy as np
 cimport cython
-from video_proj.indexing cimport idx_type
+from mstools.indexing cimport idx_type
 
 from ..util import image_to_features
 from ..indexing import py_idx_type as pidx_t

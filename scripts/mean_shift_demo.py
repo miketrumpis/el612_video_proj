@@ -1,12 +1,12 @@
 from __future__ import division
 import numpy as np
 import matplotlib.pyplot as pp
-import video_proj.mean_shift.classification as cls
-import video_proj.colors as colors
-import video_proj.util as ut
-import video_proj.importing as importing
-import video_proj.mean_shift.histogram as histogram
-import video_proj.mean_shift.topological as topo
+import mstools.mean_shift.classification as cls
+import mstools.colors as colors
+import mstools.util as ut
+import mstools.importing as importing
+import mstools.mean_shift.histogram as histogram
+import mstools.mean_shift.topological as topo
 
 import PIL.Image as PImage
 
@@ -172,7 +172,7 @@ if video:
     ## x0 = (x_mx + x_mn)//2
     ## y0 = (y_mx + y_mn)//2
     ## x = np.array([x0, y0], 'i')
-    ## import video_proj.tracking.object_model as om
+    ## import mstools.tracking.object_model as om
     ## seed = om.RectangleTrackingObject(x, hx, hy)
 
 pp.show()
