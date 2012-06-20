@@ -19,12 +19,12 @@ cimport cython
 from libcpp.vector cimport vector
 from cython.operator cimport dereference
 
-from video_proj.indexing cimport multi_idx, flatten_idc, oob, idx_type, \
+from mstools.indexing cimport multi_idx, flatten_idc, oob, idx_type, \
     array_oob, flat_idx
 from ..indexing import py_idx_type as pidx_t
-from video_proj.mean_shift.histogram import histogram
-from video_proj.mean_shift.classification import PixelModeClassifier
-from video_proj import colors, util
+from mstools.mean_shift.histogram import histogram
+from mstools.mean_shift.classification import PixelModeClassifier
+from mstools import colors, util
 
 cdef double huge = 1e16
 ctypedef np.int32_t label_type

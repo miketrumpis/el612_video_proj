@@ -3,8 +3,6 @@ import matplotlib.pyplot as pp
 import matplotlib.animation as animation
 
 from _c_util import *
-#from video_proj.tracking.tools import draw_rect
-import video_proj.tracking.tools as t
 
 def image_to_features(image):
     """
@@ -39,21 +37,6 @@ def animate_frames(frames, movie_name='', fps=5, **imshow_kw):
         #pfx='-vcodec libx264 -vpre ultrafast -crf 15 -an'
         ani.save(movie_name+'.mp4', fps=fps, codec='h264')
     return ani
-
-def animate_tracked_frames(
-        frames, locs, bws, movie_name='', fps=5, **imshow_kw
-        ):
-    fig = pp.figure()
-    ims = []
-    for n, f in enumerate(frames):
-        i = pp.imshow(f, **imshow_kw)
-        t.draw_rect(i, locs[n], bws[n][0], bws[n][1])
-        ims.append([i])
-    ani = animation.ArtistAnimation(fig, ims)
-    if movie_name:
-        ani.save(movie_name+'.mp4', fps=fps, codec='h264')
-    return ani
-
 
 def cartesian(arrays, out=None):
     """

@@ -3,7 +3,7 @@
 """
 cimport cython
 cimport numpy as np
-from video_proj.indexing cimport idx_type, clamp, flat_idx
+from mstools.indexing cimport idx_type, clamp, flat_idx
 from ..indexing import py_idx_type as pidx_t
 import numpy as np
 
